@@ -69,7 +69,7 @@ async function init() {
     M = await (await fetch('sd_model.json')).json();
   } catch (err) { $('msg').textContent = 'sd_model.json を読めません：' + err; return; }
 
-  renderer = new THREE.WebGLRenderer({ canvas: $('cv'), antialias: true });
+  renderer = new THREE.WebGLRenderer({ canvas: $('cv'), antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(innerWidth, innerHeight);
   renderer.localClippingEnabled = true;
@@ -97,12 +97,15 @@ async function init() {
   camera.position.set(c.x + sz.x * 0.35, c.y + sz.length() * 0.28, c.z + sz.length() * 0.45);
   camera.lookAt(c); controls.update();
 
-  bindUI();
+  bindUI(); buildAnchors(); initFit();
   $('sub').textContent = `三角形 ${M.parts.reduce((a, p) => a + p.f.length, 0).toLocaleString()}／`
     + `設計追距 ${M.range.lo.toFixed(3)}〜${M.range.hi.toFixed(3)}`;
   $('crs').innerHTML = `${M.origin.crs}<br>ローカル原点 X=${M.origin.X0} Y=${M.origin.Y0}<br>${M.origin.note}`;
   $('msg').classList.add('hide');
   addEventListener('resize', onResize);
+  addEventListener('orientationchange', () => {
+    screenAng = THREE.MathUtils.degToRad((screen.orientation && screen.orientation.angle) || 0);
+  });
   renderer.setAnimationLoop(tick);
   initAR();
 }
@@ -113,7 +116,8 @@ function onResize() {
 }
 function tick(time, frame) {
   if (frame) arFrame(frame);
-  if (!renderer.xr.isPresenting) controls && controls.update();
+  if (fitOn) fitTick();
+  else if (!renderer.xr.isPresenting) controls && controls.update();
   renderer.render(scene, camera);
 }
 
@@ -274,6 +278,7 @@ function onUp(e) {
   const r = renderer.domElement.getBoundingClientRect();
   const p = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1,
                               -((e.clientY - r.top) / r.height) * 2 + 1);
+  if (fitOn) { record(p); return; }        // 現地合わせ中は「狙い」の記録
   raycaster.setFromCamera(p, camera);
   const targets = Object.values(meshes).filter(o => o.visible && o.isMesh);
   const hits = raycaster.intersectObjects(targets, false);
@@ -414,4 +419,162 @@ function arFrame(frame) {
     const pose = hits[0].getPose(refSpace);
     reticle.visible = true; reticle.matrix.fromArray(pose.transform.matrix);
   } else reticle.visible = false;
+}
+
+
+// ================= 現地合わせ（カメラ重ね）=================
+//   立っている基準点は測量で出した既知点なのでカメラ位置は確定。
+//   姿勢は端末の重力センサ（上下・傾きは正確、方位だけ当てにならない）。
+//   ★画面中央の十字に別の基準点を重ねて記録すると、
+//     「その向きがちょうどその点を向く」ように姿勢を補正する。
+//     十字で合わせるので画角に関係なく厳密に決まる（検算で誤差 0.000°）。
+//   ※基準点6点はほぼ一直線に並ぶ（開き角 2〜5°）ので、画角は解けない。
+//     画角は一度スライダーで合わせれば端末ごとに保存する。
+let fitOn = false, fitStream = null, fitQ = new THREE.Quaternion();
+let corr = new THREE.Quaternion();      // 姿勢の補正
+let yawTrim = 0, pitchTrim = 0, fovCal = 65, screenAng = 0;
+let lastShot = null;
+let anchorGrp = null;
+const ZKEY = 'sd_anchor_z', FKEY = 'sd_fov';
+
+function anchorZ() {
+  let ov = {};
+  try { ov = JSON.parse(localStorage.getItem(ZKEY) || '{}'); } catch (e) {}
+  return M.anchors.map(a => ({ ...a, z: (ov[a.name] != null ? +ov[a.name] : a.z_plan) }));
+}
+
+function buildAnchors() { anchorGrp = new THREE.Group(); root.add(anchorGrp); redrawAnchors(); }
+function redrawAnchors() {
+  while (anchorGrp.children.length) anchorGrp.remove(anchorGrp.children[0]);
+  for (const a of anchorZ()) {
+    const h = 2.0;
+    const g = new THREE.CylinderGeometry(0.035, 0.035, h, 8).rotateX(Math.PI / 2).translate(a.x, a.y, a.z + h / 2);
+    anchorGrp.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xd23b2f })));
+    const sp = label(a.name, a.z.toFixed(3) + ' m');
+    sp.position.set(a.x, a.y, a.z + h + 1.2); sp.scale.set(6, 2.3, 1);
+    anchorGrp.add(sp);
+  }
+}
+
+const camPos = () => {
+  const A = anchorZ().find(x => x.name === $('fitAt').value) || anchorZ()[0];
+  return toWorld(A.x, A.y, A.z + (+$('fitEye').value || 1.55));
+};
+const dirTo = (name) => {
+  const a = anchorZ().find(x => x.name === name);
+  return toWorld(a.x, a.y, a.z).sub(camPos()).normalize();
+};
+const FWD = new THREE.Vector3(0, 0, -1);
+
+// 十字（画面中央）に合わせて記録 → 姿勢の補正を作る
+function record() {
+  const target = $('fitTo').value;
+  const prev = lastShot;
+  const q = fitQ.clone();
+  const v0 = FWD.clone().applyQuaternion(q);          // いま十字が向いている方向
+  const d = dirTo(target);                            // 本当に向いているべき方向
+  corr = new THREE.Quaternion().setFromUnitVectors(v0, d);
+  lastShot = { target, q };
+  yawTrim = 0; pitchTrim = 0;
+  $('fitYaw').value = 0; $('fitYawV').textContent = '0.00°';
+  $('fitState').textContent = `${target} で合わせ済`;
+  // 前の記録が残っていれば、その点が今どれだけずれて見えるかを出す（合わせの検算）
+  if (prev && prev.target !== target) {
+    const vp = FWD.clone().applyQuaternion(corr.clone().multiply(prev.q));
+    const dp = dirTo(prev.target);
+    const err = THREE.MathUtils.radToDeg(vp.angleTo(dp));
+    const pa = anchorZ().find(x => x.name === prev.target);
+    const L = camPos().distanceTo(toWorld(pa.x, pa.y, pa.z));
+    $('fitTip').textContent =
+      `${prev.target} との差 ${err.toFixed(2)}°（${L.toFixed(0)} m 先で ${(L * Math.tan(THREE.MathUtils.degToRad(err))).toFixed(2)} m）。`
+      + '大きいときは、立っている点・目線の高さ・杭の標高を確かめてください。';
+  } else {
+    $('fitTip').textContent = '合わせました。別の基準点でも合わせ直すと、ずれ量が確認できます。';
+  }
+  const i = $('fitTo').selectedIndex;
+  $('fitTo').selectedIndex = Math.min(i + 1, M.anchors.length - 1);
+}
+
+// 端末の姿勢 → クォータニオン（重力基準。方位は当てにしない）
+const _e = new THREE.Euler(), _q1 = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2), _q0 = new THREE.Quaternion();
+const ZEE = new THREE.Vector3(0, 0, 1);
+function onOrient(ev) {
+  const a = THREE.MathUtils.degToRad(ev.alpha || 0), b = THREE.MathUtils.degToRad(ev.beta || 0),
+        g = THREE.MathUtils.degToRad(ev.gamma || 0);
+  _e.set(b, a, -g, 'YXZ');
+  fitQ.setFromEuler(_e); fitQ.multiply(_q1);
+  fitQ.multiply(_q0.setFromAxisAngle(ZEE, -screenAng));
+}
+
+async function startFit() {
+  try {
+    fitStream = await navigator.mediaDevices.getUserMedia(
+      { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 } }, audio: false });
+  } catch (e) { alert('カメラを使えません：' + e.message + '\nHTTPS で開いているか確認してください。'); return; }
+  const v = $('vid'); v.srcObject = fitStream; await v.play().catch(() => {});
+  if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) {
+    try { const r = await DeviceOrientationEvent.requestPermission();
+      if (r !== 'granted') alert('「動作と方向」の許可が要ります。Safari の設定から許可してください。'); } catch (e) {}
+  }
+  screenAng = THREE.MathUtils.degToRad((screen.orientation && screen.orientation.angle) || 0);
+  addEventListener('deviceorientation', onOrient, true);
+  fitOn = true; controls.enabled = false; scene.background = null;
+  $('vid').classList.add('show'); $('xh').classList.add('show'); $('fitui').classList.add('show');
+  $('bFit').classList.add('on'); $('sheet').classList.remove('open'); $('bPanel').classList.remove('on');
+  $('fitState').textContent = '未合わせ';
+  $('fitTip').textContent = '① 立っている基準点と目線の高さを入れる　② 見えている別の基準点を選び、画面中央の十字にその杭を重ねて「記録」';
+}
+function endFit() {
+  fitOn = false; removeEventListener('deviceorientation', onOrient, true);
+  if (fitStream) { fitStream.getTracks().forEach(t => t.stop()); fitStream = null; }
+  $('vid').classList.remove('show'); $('xh').classList.remove('show'); $('fitui').classList.remove('show');
+  $('bFit').classList.remove('on');
+  controls.enabled = true; scene.background = new THREE.Color(0xf4f5f3);
+  corr.identity(); lastShot = null; yawTrim = pitchTrim = 0;
+  camera.fov = 55; camera.updateProjectionMatrix();
+}
+
+function initFit() {
+  fovCal = +(localStorage.getItem(FKEY) || 65);
+  const A = M.anchors;
+  for (const id of ['fitAt', 'fitTo']) {
+    const sel = $(id);
+    A.forEach(a => { const o = document.createElement('option'); o.value = a.name;
+      o.textContent = `${a.name}（設計追距 ${a.ds.toFixed(0)}）`; sel.appendChild(o); });
+  }
+  $('fitAt').selectedIndex = 0; $('fitTo').selectedIndex = 1;
+  const zbox = $('fitZ'), ov = anchorZ();
+  A.forEach((a, i) => {
+    const d = document.createElement('div'); d.className = 'zrow';
+    d.innerHTML = `<span>${a.name}</span><input type="number" step="0.001" data-n="${a.name}"
+      value="${ov[i].z.toFixed(3)}"><span class="k" style="width:auto">計画 ${a.z_plan.toFixed(3)}</span>`;
+    zbox.appendChild(d);
+  });
+  $('fitZSave').onclick = () => {
+    const o = {}; zbox.querySelectorAll('input').forEach(i => o[i.dataset.n] = +i.value);
+    localStorage.setItem(ZKEY, JSON.stringify(o)); redrawAnchors();
+    $('fitTip').textContent = '標高を保存しました。もう一度「記録」で合わせ直してください。';
+  };
+  $('fitZReset').onclick = () => {
+    localStorage.removeItem(ZKEY); redrawAnchors();
+    zbox.querySelectorAll('input').forEach(i => { const a = A.find(x => x.name === i.dataset.n); i.value = a.z_plan.toFixed(3); });
+  };
+  $('bFit').onclick = () => { fitOn ? endFit() : startFit(); };
+  $('fitEnd').onclick = endFit;
+  $('fitTap').onclick = record;
+  $('fitReset').onclick = () => { corr.identity(); lastShot = null; yawTrim = pitchTrim = 0;
+    $('fitYaw').value = 0; $('fitYawV').textContent = '0.00°';
+    $('fitState').textContent = '未合わせ'; $('fitTip').textContent = '狙う点を選んで、十字に重ねて「記録」。'; };
+  $('fitYaw').oninput = () => { const d = +$('fitYaw').value / 20;
+    yawTrim = THREE.MathUtils.degToRad(d); $('fitYawV').textContent = d.toFixed(2) + '°'; };
+  $('fitFov').value = fovCal; $('fitFovV').textContent = fovCal.toFixed(1) + '°';
+  $('fitFov').oninput = () => { fovCal = +$('fitFov').value; $('fitFovV').textContent = fovCal.toFixed(1) + '°';
+    localStorage.setItem(FKEY, fovCal); };
+}
+
+function fitTick() {
+  camera.position.copy(camPos());
+  if (camera.fov !== fovCal) { camera.fov = fovCal; camera.updateProjectionMatrix(); }
+  const t = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawTrim);
+  camera.quaternion.copy(t.multiply(corr).multiply(fitQ));
 }

@@ -16,6 +16,22 @@
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
   font:14px/1.5 system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif}
 #cv{position:fixed;inset:0;display:block;touch-action:none}
+#vid{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;display:none;background:#000}
+#vid.show{display:block}
+#fitui{position:fixed;left:0;right:0;bottom:0;z-index:12;background:rgba(255,255,255,.96);
+  border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  display:none;max-height:58vh;overflow-y:auto}
+#fitui.show{display:block}
+#xh{position:fixed;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;z-index:11;
+  pointer-events:none;display:none}
+#xh.show{display:block}
+#xh:before,#xh:after{content:"";position:absolute;background:#d23b2f}
+#xh:before{left:21px;top:0;width:2px;height:44px}
+#xh:after{top:21px;left:0;height:2px;width:44px}
+.zrow{display:flex;gap:6px;align-items:center;padding:2px 0}
+.zrow span{width:3em;font-weight:700;font-size:12px}
+.zrow input{flex:1;padding:5px;border:1px solid var(--line);border-radius:6px;font-size:13px}
+select,input[type=number]{padding:6px;border:1px solid var(--line);border-radius:6px;font-size:13px}
 #top{position:fixed;top:0;left:0;right:0;height:48px;display:flex;align-items:center;gap:6px;
   padding:0 8px;background:rgba(255,255,255,.92);backdrop-filter:blur(6px);
   border-bottom:1px solid var(--line);z-index:10}
@@ -54,10 +70,13 @@ input[type=range]{width:100%}
 </style>
 </head>
 <body>
+<video id="vid" playsinline muted autoplay></video>
 <canvas id="cv"></canvas>
+<div id="xh"></div>
 
 <div id="top">
   <div id="ttl">塩田川 その4 左岸 完成形<small id="sub">読み込み中…</small></div>
+  <button class="btn" id="bFit">現地合わせ</button>
   <button class="btn" id="bMeasure">計測</button>
   <button class="btn g" id="bAR">AR</button>
   <button class="btn" id="bPanel">表示</button>
@@ -103,6 +122,25 @@ input[type=range]{width:100%}
 <a id="arq" rel="ar" href="model.usdz" style="position:fixed;left:-9999px" aria-hidden="true"><img src="icon-192.png" alt="AR" width="1" height="1"></a>
 
 <div id="hud"></div>
+
+<div id="fitui">
+  <div class="row"><b style="font-size:13px">現地合わせ</b><span class="k" id="fitState" style="flex:1;text-align:right"></span></div>
+  <div class="row"><span class="k" style="width:5.5em">立っている点</span><select id="fitAt" style="flex:1"></select></div>
+  <div class="row"><span class="k" style="width:5.5em">目線の高さ</span><input type="number" id="fitEye" value="1.55" step="0.05" min="1.0" max="2.0" style="width:6em"><span class="k">m（点の頭からの高さ）</span></div>
+  <div class="row"><span class="k" style="width:5.5em">狙う点</span><select id="fitTo" style="flex:1"></select>
+    <button class="btn g" id="fitTap">十字に重ねて記録</button></div>
+  <div class="row"><button class="btn" id="fitReset" style="flex:1">やり直す</button>
+                  <button class="btn" id="fitEnd" style="flex:1">終了</button></div>
+  <div class="row"><span class="k" style="width:4em">方位</span><input type="range" id="fitYaw" min="-100" max="100" value="0"><span class="mono k" id="fitYawV" style="width:4.5em;text-align:right">0.00°</span></div>
+  <div class="row"><span class="k" style="width:4em">画角</span><input type="range" id="fitFov" min="35" max="90" value="60" step="0.5"><span class="mono k" id="fitFovV" style="width:4.5em;text-align:right">60°</span></div>
+  <div class="tiny" id="fitTip"></div>
+  <details style="margin-top:6px"><summary class="k" style="cursor:pointer">基準点の標高（現地実測値を入れる）</summary>
+    <div id="fitZ" style="margin-top:6px"></div>
+    <div class="row"><button class="btn" id="fitZSave" style="flex:1">保存</button>
+                    <button class="btn" id="fitZReset" style="flex:1">計画値に戻す</button></div>
+    <div class="tiny">この端末に保存されます。杭の頭の標高を入れてください。</div>
+  </details>
+</div>
 
 <div id="arui">
   <div class="row"><span class="k" style="width:5em">基準の杭</span><select id="anchor" style="flex:1;padding:6px"></select></div>
