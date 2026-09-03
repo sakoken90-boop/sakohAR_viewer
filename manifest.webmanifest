@@ -1,0 +1,17 @@
+{
+  "name": "塩田川 その4 左岸 完成形ビューア",
+  "short_name": "塩田川ビューア",
+  "description": "二級河川塩田川 河川改修工事（その4）左岸 完成形の3Dビューア。部品切替・透過・測点スライス・計測・現地AR。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f5f3",
+  "theme_color": "#1b3a5c",
+  "lang": "ja",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
