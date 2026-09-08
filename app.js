@@ -29,7 +29,9 @@ const OFF = new Set(['かごマット2段_横断図', 'かごマット3段_横�
   '線_大型張ブロック', '線_縦帯コンクリート', '線_基礎コンクリートブロック',
   '線_均しコンクリート', '線_根固めブロック', '線_かごマット2段_平面図',
   '線_かごマット3段_平面図', '線_かごマット2段_横断図', '線_かごマット3段_横断図',
-  '線_階段_本体', '線_階段_小口止工', '線_横帯工']);
+  '線_階段_本体', '線_階段_小口止工', '線_横帯工',
+  'AR基準点']);          // ★S30 モデル側のポールは USDZ／SketchUp 用。
+                        //    ビューアは app.js が自前で描くので既定 OFF（二重＋視界を塞ぐ）
 
 // ---------- 座標の行き来 ----------
 const toWorld = (e, n, z) => new THREE.Vector3(e, z, -n);
@@ -446,9 +448,11 @@ function anchorZ() {
 }
 
 function buildAnchors() { anchorGrp = new THREE.Group(); root.add(anchorGrp); redrawAnchors(); }
+let fitSkip = null;      // ★S30 現地合わせ中、立っている点のポールは描かない
 function redrawAnchors() {
   while (anchorGrp.children.length) anchorGrp.remove(anchorGrp.children[0]);
   for (const a of anchorZ()) {
+    if (fitSkip && a.name === fitSkip) continue;   // ★カメラがこの中に入るので隠す
     const h = 2.0;
     const g = new THREE.CylinderGeometry(0.035, 0.035, h, 8).rotateX(Math.PI / 2).translate(a.x, a.y, a.z + h / 2);
     anchorGrp.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xd23b2f })));
@@ -545,6 +549,8 @@ function record(ndc) {
 // 次に狙う点＝まだ記録していない中で 一番遠い点
 function nextTarget() {
   const at = $('fitAt').value, A = anchorZ();
+  // ★S30 立っている点は狙えない（自分の足元）。選択肢から外す
+  for (const o of $('fitTo').options) o.disabled = (o.value === at);
   const a = A.find(x => x.name === at) || A[0];
   const cand = A.filter(b => b.name !== a.name && !shots.some(s => s.target === b.name));
   const list = (cand.length ? cand : A.filter(b => b.name !== a.name))
@@ -579,6 +585,7 @@ async function startFit() {
   fitOn = true; controls.enabled = false; scene.background = null;
   $('vid').classList.add('show'); $('xh').classList.add('show'); $('fitui').classList.add('show');
   shots.length = 0; $('fitShots').textContent = '記録 0 点';
+  fitSkip = $('fitAt').value; redrawAnchors();      // ★S30 足元のポールを隠す
   nextTarget(); sizeLoupe(); showLoupe($('cLoupe').checked);
   $('bFit').classList.add('on'); $('sheet').classList.remove('open'); $('bPanel').classList.remove('on');
   $('fitState').textContent = '未合わせ';
@@ -590,6 +597,7 @@ function endFit() {
   fitOn = false; removeEventListener('deviceorientation', onOrient, true);
   if (fitStream) { fitStream.getTracks().forEach(t => t.stop()); fitStream = null; }
   $('vid2').srcObject = null; showLoupe(false);
+  fitSkip = null; redrawAnchors();                  // ★S30 元に戻す
   $('vid').classList.remove('show'); $('xh').classList.remove('show'); $('fitui').classList.remove('show');
   $('bFit').classList.remove('on');
   controls.enabled = true; scene.background = new THREE.Color(0xf4f5f3);
@@ -608,7 +616,9 @@ function initFit() {
   $('fitAt').selectedIndex = 0; $('fitTo').selectedIndex = 1;
   // ★S29 立っている点を変えたら 記録を捨てて 狙う点を一番遠い点にし直す
   $('fitAt').onchange = () => { shots.length = 0; corr.identity();
-    $('fitShots').textContent = '記録 0 点'; $('fitState').textContent = '未合わせ'; nextTarget(); };
+    $('fitShots').textContent = '記録 0 点'; $('fitState').textContent = '未合わせ';
+    if (fitOn) { fitSkip = $('fitAt').value; redrawAnchors(); }
+    nextTarget(); };
   $('cLoupe').onchange = e => showLoupe(e.target.checked);
   $('loupeZ').onchange = sizeLoupe;
   $('bPrint').onclick = printView;

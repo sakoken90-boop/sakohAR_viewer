@@ -15,8 +15,11 @@
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
   font:14px/1.5 system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif}
-#cv{position:fixed;inset:0;display:block;touch-action:none}
-#vid{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;display:none;background:#000}
+/* ★S30 重ね順。#vid を z-index:-1 にすると body の背景（--bg）に隠れて
+   カメラ映像が出ない（負の z-index は body の背景より先に描かれるため）。
+   映像 0 ／ 3D 1 にして、その上に UI（8〜20）が乗る。 */
+#cv{position:fixed;inset:0;display:block;touch-action:none;z-index:1}
+#vid{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;background:#000}
 #vid.show{display:block}
 #fitui{position:fixed;left:0;right:0;bottom:0;z-index:12;background:rgba(255,255,255,.96);
   border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom));
