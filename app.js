@@ -534,7 +534,9 @@ function record(ndc) {
   $('fitState').textContent = shots.length === 1
     ? `${target} で合わせ済` : `${shots.length} 点の平均で合わせ済`;
   if (shots.length === 1) {
-    $('fitTip').textContent = '★もう1点、できるだけ遠い基準点でも「記録」すると、平均が効いて精度が上がります。';
+    $('fitTip').textContent = `★${target} を記録しました（緑＝記録済）。`
+      + '続けて 別の基準点でも「記録」すると 平均が効いて精度が上がります。'
+      + '狙う点は 自動で 次に遠い未記録の点に進みます（チップを押せば手で選べます）。';
   } else {
     const deg = THREE.MathUtils.radToDeg(r.worst);
     $('fitTip').textContent =
@@ -544,6 +546,26 @@ function record(ndc) {
       + '大きいときは 立ち位置・カメラの高さ・杭の標高を確かめてください。';
   }
   nextTarget();
+}
+
+// ★S31 どの点を記録したか・いまどれを狙うかを チップで見せる
+function renderChips() {
+  const box = $('fitChips'); if (!box) return;
+  const at = $('fitAt').value, aim = $('fitTo').value;
+  box.innerHTML = '';
+  for (const a of anchorZ()) {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    const done = shots.some(s => s.target === a.name);
+    if (a.name === at) { b.classList.add('here'); b.textContent = a.name + '（立）'; }
+    else {
+      if (done) b.classList.add('done');
+      if (a.name === aim) b.classList.add('aim');
+      b.textContent = a.name + (done ? ' ✓' : '');
+      b.onclick = () => { $('fitTo').value = a.name; renderChips(); };
+    }
+    box.appendChild(b);
+  }
 }
 
 // 次に狙う点＝まだ記録していない中で 一番遠い点
@@ -556,6 +578,7 @@ function nextTarget() {
   const list = (cand.length ? cand : A.filter(b => b.name !== a.name))
     .map(b => ({ b, d: Math.hypot(b.x - a.x, b.y - a.y) })).sort((x, y) => y.d - x.d);
   if (list.length) $('fitTo').value = list[0].b.name;
+  renderChips();
 }
 
 // 端末の姿勢 → クォータニオン（重力基準。方位は当てにしない）
@@ -619,6 +642,7 @@ function initFit() {
     $('fitShots').textContent = '記録 0 点'; $('fitState').textContent = '未合わせ';
     if (fitOn) { fitSkip = $('fitAt').value; redrawAnchors(); }
     nextTarget(); };
+  $('fitTo').onchange = renderChips;
   $('cLoupe').onchange = e => showLoupe(e.target.checked);
   $('loupeZ').onchange = sizeLoupe;
   $('bPrint').onclick = printView;

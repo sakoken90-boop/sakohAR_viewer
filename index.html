@@ -54,6 +54,12 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
   #printsheet td,#printsheet th{border:1px solid #999;padding:1.2mm 2mm;text-align:left;vertical-align:top}
   @page{size:A4 landscape;margin:10mm}
 }
+/* ★S31 記録の状態が一目で分かるチップ */
+.chip{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:14px;
+  padding:4px 9px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.chip.done{background:#2f6f4e;border-color:#2f6f4e;color:#fff}      /* 記録済 */
+.chip.aim{outline:2px solid #d23b2f;outline-offset:1px}             /* いま狙う点 */
+.chip.here{background:#e9edf1;color:#8a95a0;cursor:default}         /* 立っている点 */
 .zrow{display:flex;gap:6px;align-items:center;padding:2px 0}
 .zrow span{width:3em;font-weight:700;font-size:12px}
 .zrow input{flex:1;padding:5px;border:1px solid var(--line);border-radius:6px;font-size:13px}
@@ -173,6 +179,7 @@ input[type=range]{width:100%}
     <span class="k">倍率</span>
     <select id="loupeZ" style="width:5em"><option>2</option><option selected>3</option><option>5</option><option>8</option></select>
     <span class="k" style="flex:1;text-align:right" id="fitShots">記録 0 点</span></div>
+  <div class="row" id="fitChips" style="flex-wrap:wrap;gap:4px"></div>
   <div class="tiny" id="fitTip"></div>
   <details style="margin-top:6px"><summary class="k" style="cursor:pointer">基準点の標高（現地実測値を入れる）</summary>
     <div id="fitZ" style="margin-top:6px"></div>

@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v4';   // ★S30 足元のポールで視界が塞がるのを直した。上げないと端末が古いキャッシュを出す
+const V = 'sd-viewer-v5';   // ★S31 記録状態のチップ表示
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
