@@ -28,29 +28,6 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 #xh:before,#xh:after{content:"";position:absolute;background:#d23b2f}
 #xh:before{left:21px;top:0;width:2px;height:44px}
 #xh:after{top:21px;left:0;height:2px;width:44px}
-/* ★S29 ルーペ（十字まわりの拡大）。指し精度を上げる */
-#loupe{position:fixed;left:50%;top:50%;width:180px;height:180px;margin:-260px 0 0 -90px;
-  border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,.95);
-  box-shadow:0 3px 12px rgba(0,0,0,.45);z-index:13;display:none;background:#000;pointer-events:none}
-#loupe.show{display:block}
-#loupe video{position:absolute;left:50%;top:50%;object-fit:cover;transform-origin:50% 50%}
-#loupe:before,#loupe:after{content:"";position:absolute;background:#d23b2f;z-index:2}
-#loupe:before{left:89px;top:0;width:2px;height:180px}
-#loupe:after{top:89px;left:0;height:2px;width:180px}
-#loupeMag{position:fixed;left:50%;top:50%;margin:-80px 0 0 -90px;width:180px;text-align:center;
-  z-index:13;display:none;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8)}
-#loupeMag.show{display:block}
-/* ★S29 印刷用 */
-#printsheet{display:none}
-@media print{
-  body>*{display:none!important}
-  #printsheet{display:block!important;position:static}
-  #printsheet img{width:100%;border:1px solid #999}
-  #printsheet h1{font-size:15pt;margin:0 0 2mm}
-  #printsheet table{border-collapse:collapse;font-size:9pt;margin-top:3mm;width:100%}
-  #printsheet td,#printsheet th{border:1px solid #999;padding:1.2mm 2mm;text-align:left;vertical-align:top}
-  @page{size:A4 landscape;margin:10mm}
-}
 .zrow{display:flex;gap:6px;align-items:center;padding:2px 0}
 .zrow span{width:3em;font-weight:700;font-size:12px}
 .zrow input{flex:1;padding:5px;border:1px solid var(--line);border-radius:6px;font-size:13px}
@@ -96,8 +73,6 @@ input[type=range]{width:100%}
 <video id="vid" playsinline muted autoplay></video>
 <canvas id="cv"></canvas>
 <div id="xh"></div>
-<div id="loupe"><video id="vid2" playsinline muted autoplay></video></div>
-<div id="loupeMag"></div>
 
 <div id="top">
   <div id="ttl">塩田川 その4 左岸 完成形<small id="sub">読み込み中…</small></div>
@@ -139,14 +114,6 @@ input[type=range]{width:100%}
   </div>
 
   <div class="sec">
-    <h3>印刷（PC 向け）</h3>
-    <div class="row"><button class="btn" id="bPrint" style="flex:1">この画面を印刷</button></div>
-    <div class="row"><label style="flex:none"><input type="checkbox" id="pInfo" checked> 情報の表を付ける</label></div>
-    <div class="tiny">いま見えている画面をそのまま A4 横で印刷します。
-      表示中の部品・断面位置・座標系・日時が表に入ります。PDF 保存もできます。</div>
-  </div>
-
-  <div class="sec">
     <h3>座標系</h3>
     <div class="tiny mono" id="crs"></div>
   </div>
@@ -159,17 +126,13 @@ input[type=range]{width:100%}
 <div id="fitui">
   <div class="row"><b style="font-size:13px">現地合わせ</b><span class="k" id="fitState" style="flex:1;text-align:right"></span></div>
   <div class="row"><span class="k" style="width:5.5em">立っている点</span><select id="fitAt" style="flex:1"></select></div>
-  <div class="row"><span class="k" style="width:5.5em">カメラの高さ</span><input type="number" id="fitEye" value="1.55" step="0.005" min="0.20" max="2.50" style="width:6em"><span class="k">m（★杭の頭から カメラのレンズまで）</span></div>
+  <div class="row"><span class="k" style="width:5.5em">目線の高さ</span><input type="number" id="fitEye" value="1.55" step="0.05" min="1.0" max="2.0" style="width:6em"><span class="k">m（点の頭からの高さ）</span></div>
   <div class="row"><span class="k" style="width:5.5em">狙う点</span><select id="fitTo" style="flex:1"></select>
     <button class="btn g" id="fitTap">十字に重ねて記録</button></div>
   <div class="row"><button class="btn" id="fitReset" style="flex:1">やり直す</button>
                   <button class="btn" id="fitEnd" style="flex:1">終了</button></div>
   <div class="row"><span class="k" style="width:4em">方位</span><input type="range" id="fitYaw" min="-100" max="100" value="0"><span class="mono k" id="fitYawV" style="width:4.5em;text-align:right">0.00°</span></div>
   <div class="row"><span class="k" style="width:4em">画角</span><input type="range" id="fitFov" min="35" max="90" value="60" step="0.5"><span class="mono k" id="fitFovV" style="width:4.5em;text-align:right">60°</span></div>
-  <div class="row"><label style="flex:none"><input type="checkbox" id="cLoupe" checked> ルーペ</label>
-    <span class="k">倍率</span>
-    <select id="loupeZ" style="width:5em"><option>2</option><option selected>3</option><option>5</option><option>8</option></select>
-    <span class="k" style="flex:1;text-align:right" id="fitShots">記録 0 点</span></div>
   <div class="tiny" id="fitTip"></div>
   <details style="margin-top:6px"><summary class="k" style="cursor:pointer">基準点の標高（現地実測値を入れる）</summary>
     <div id="fitZ" style="margin-top:6px"></div>
@@ -187,8 +150,6 @@ input[type=range]{width:100%}
   <div class="row"><span class="k" style="width:4em">高さ</span><input type="range" id="arZ" min="-300" max="300" value="0"><span class="mono k" id="arZV" style="width:4em;text-align:right">0.00</span></div>
   <div class="tiny" id="arTip">床を映して輪郭が出たら「① 足元に合わせる」を押してください。</div>
 </div>
-
-<div id="printsheet"></div>
 
 <div id="msg">読み込み中…</div>
 

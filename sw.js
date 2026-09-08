@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v2';   // ★S26：基準点ポール入りに更新。上げないと端末が古いキャッシュを出す
+const V = 'sd-viewer-v3';   // ★S29 ルーペ・複数点平均・印刷。上げないと端末が古いキャッシュを出す
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

@@ -69,8 +69,7 @@ async function init() {
     M = await (await fetch('sd_model.json')).json();
   } catch (err) { $('msg').textContent = 'sd_model.json を読めません：' + err; return; }
 
-  renderer = new THREE.WebGLRenderer({ canvas: $('cv'), antialias: true, alpha: true,
-                                       preserveDrawingBuffer: true });   // ★S29 印刷用
+  renderer = new THREE.WebGLRenderer({ canvas: $('cv'), antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(innerWidth, innerHeight);
   renderer.localClippingEnabled = true;
@@ -114,7 +113,6 @@ async function init() {
 function onResize() {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
-  sizeLoupe();
 }
 function tick(time, frame) {
   if (frame) arFrame(frame);
@@ -435,7 +433,7 @@ function arFrame(frame) {
 let fitOn = false, fitStream = null, fitQ = new THREE.Quaternion();
 let corr = new THREE.Quaternion();      // 姿勢の補正
 let yawTrim = 0, pitchTrim = 0, fovCal = 65, screenAng = 0;
-// （S29：単発の記録は shots[] に統合した）
+let lastShot = null;
 let anchorGrp = null;
 const ZKEY = 'sd_anchor_z', FKEY = 'sd_fov';
 
@@ -468,88 +466,33 @@ const dirTo = (name) => {
 };
 const FWD = new THREE.Vector3(0, 0, -1);
 
-// ★S29 記録は複数点を溜めて 最小二乗（方位・仰角の平均）で姿勢の補正を作る
-//    重力センサで上下・傾きは出ているので、未知なのは方位。仰角の系統ずれも一緒に均す。
-const UP = new THREE.Vector3(0, 1, 0);
-const shots = [];                       // {target, q, ndc}
-const bearing = (v) => Math.atan2(v.x, v.z);
-const elev    = (v) => Math.asin(THREE.MathUtils.clamp(v.y, -1, 1));
-const wrap    = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-
-// 画面上の点（NDC）が指している向き。ndc 省略で画面中央（＝十字）
-function shotDir(q, ndc) {
-  const d = new THREE.Vector3(0, 0, -1);
-  if (ndc) {
-    const ty = Math.tan(THREE.MathUtils.degToRad(fovCal) / 2);
-    d.set(ndc.x * ty * (innerWidth / innerHeight), ndc.y * ty, -1).normalize();
-  }
-  return d.applyQuaternion(q);
-}
-
-function solveCorr() {
-  if (!shots.length) { corr.identity(); return null; }
-  let sy = 0, sp = 0; const md = new THREE.Vector3();
-  const each = [];
-  for (const s of shots) {
-    const v0 = shotDir(s.q, s.ndc), d = dirTo(s.target);
-    const dy = wrap(bearing(d) - bearing(v0)), dp = elev(d) - elev(v0);
-    sy += dy; sp += dp; md.add(d); each.push({ s, dy, dp, d });
-  }
-  const my = sy / shots.length, mp = sp / shots.length;
-  md.normalize();
-  const ax = new THREE.Vector3().crossVectors(UP, md).normalize();
-  corr.copy(new THREE.Quaternion().setFromAxisAngle(UP, my));
-  if (ax.lengthSq() > 1e-9) corr.multiply(new THREE.Quaternion().setFromAxisAngle(ax, -mp));
-  // 残差（各点が どれだけ外れているか）
-  let worst = 0, wn = '';
-  for (const e of each) {
-    const v = shotDir(e.s.q, e.s.ndc).applyQuaternion(corr);
-    const err = v.angleTo(e.d);
-    const L = camPos().distanceTo(anchorWorld(e.s.target));
-    if (err > worst) { worst = err; wn = e.s.target; }
-    e.err = err; e.L = L;
-  }
-  return { my, mp, worst, wn, each };
-}
-
-function anchorWorld(name) {
-  const a = anchorZ().find(x => x.name === name);
-  return toWorld(a.x, a.y, a.z);
-}
-
-// 十字（またはタップした点）に重ねて記録
-function record(ndc) {
+// 十字（画面中央）に合わせて記録 → 姿勢の補正を作る
+function record() {
   const target = $('fitTo').value;
-  const i = shots.findIndex(s => s.target === target);
-  const rec = { target, q: fitQ.clone(), ndc: (ndc && ndc.isVector2) ? ndc.clone() : null };
-  if (i >= 0) shots[i] = rec; else shots.push(rec);      // 同じ点は上書き
-  const r = solveCorr();
-  yawTrim = pitchTrim = 0;
+  const prev = lastShot;
+  const q = fitQ.clone();
+  const v0 = FWD.clone().applyQuaternion(q);          // いま十字が向いている方向
+  const d = dirTo(target);                            // 本当に向いているべき方向
+  corr = new THREE.Quaternion().setFromUnitVectors(v0, d);
+  lastShot = { target, q };
+  yawTrim = 0; pitchTrim = 0;
   $('fitYaw').value = 0; $('fitYawV').textContent = '0.00°';
-  $('fitShots').textContent = `記録 ${shots.length} 点`;
-  $('fitState').textContent = shots.length === 1
-    ? `${target} で合わせ済` : `${shots.length} 点の平均で合わせ済`;
-  if (shots.length === 1) {
-    $('fitTip').textContent = '★もう1点、できるだけ遠い基準点でも「記録」すると、平均が効いて精度が上がります。';
-  } else {
-    const deg = THREE.MathUtils.radToDeg(r.worst);
+  $('fitState').textContent = `${target} で合わせ済`;
+  // 前の記録が残っていれば、その点が今どれだけずれて見えるかを出す（合わせの検算）
+  if (prev && prev.target !== target) {
+    const vp = FWD.clone().applyQuaternion(corr.clone().multiply(prev.q));
+    const dp = dirTo(prev.target);
+    const err = THREE.MathUtils.radToDeg(vp.angleTo(dp));
+    const pa = anchorZ().find(x => x.name === prev.target);
+    const L = camPos().distanceTo(toWorld(pa.x, pa.y, pa.z));
     $('fitTip').textContent =
-      `${shots.length} 点の平均。最大残差 ${deg.toFixed(3)}°（${r.wn}／`
-      + `${r.each.find(e => e.s.target === r.wn).L.toFixed(0)} m 先で `
-      + `${(r.each.find(e => e.s.target === r.wn).L * Math.tan(r.worst)).toFixed(2)} m）。`
-      + '大きいときは 立ち位置・カメラの高さ・杭の標高を確かめてください。';
+      `${prev.target} との差 ${err.toFixed(2)}°（${L.toFixed(0)} m 先で ${(L * Math.tan(THREE.MathUtils.degToRad(err))).toFixed(2)} m）。`
+      + '大きいときは、立っている点・目線の高さ・杭の標高を確かめてください。';
+  } else {
+    $('fitTip').textContent = '合わせました。別の基準点でも合わせ直すと、ずれ量が確認できます。';
   }
-  nextTarget();
-}
-
-// 次に狙う点＝まだ記録していない中で 一番遠い点
-function nextTarget() {
-  const at = $('fitAt').value, A = anchorZ();
-  const a = A.find(x => x.name === at) || A[0];
-  const cand = A.filter(b => b.name !== a.name && !shots.some(s => s.target === b.name));
-  const list = (cand.length ? cand : A.filter(b => b.name !== a.name))
-    .map(b => ({ b, d: Math.hypot(b.x - a.x, b.y - a.y) })).sort((x, y) => y.d - x.d);
-  if (list.length) $('fitTo').value = list[0].b.name;
+  const i = $('fitTo').selectedIndex;
+  $('fitTo').selectedIndex = Math.min(i + 1, M.anchors.length - 1);
 }
 
 // 端末の姿勢 → クォータニオン（重力基準。方位は当てにしない）
@@ -569,7 +512,6 @@ async function startFit() {
       { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 } }, audio: false });
   } catch (e) { alert('カメラを使えません：' + e.message + '\nHTTPS で開いているか確認してください。'); return; }
   const v = $('vid'); v.srcObject = fitStream; await v.play().catch(() => {});
-  const v2 = $('vid2'); v2.srcObject = fitStream; v2.play().catch(() => {});   // ★S29 ルーペ
   if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) {
     try { const r = await DeviceOrientationEvent.requestPermission();
       if (r !== 'granted') alert('「動作と方向」の許可が要ります。Safari の設定から許可してください。'); } catch (e) {}
@@ -578,22 +520,17 @@ async function startFit() {
   addEventListener('deviceorientation', onOrient, true);
   fitOn = true; controls.enabled = false; scene.background = null;
   $('vid').classList.add('show'); $('xh').classList.add('show'); $('fitui').classList.add('show');
-  shots.length = 0; $('fitShots').textContent = '記録 0 点';
-  nextTarget(); sizeLoupe(); showLoupe($('cLoupe').checked);
   $('bFit').classList.add('on'); $('sheet').classList.remove('open'); $('bPanel').classList.remove('on');
   $('fitState').textContent = '未合わせ';
-  $('fitTip').textContent = '① 立っている基準点と カメラの高さ（レンズまで）を入れる　'
-    + '② 見えている中で ★一番遠い基準点を選び、画面中央の十字にその杭を重ねて「記録」　'
-    + '③ もう1〜2点でも記録すると 平均が効く（ルーペで拡大できます）';
+  $('fitTip').textContent = '① 立っている基準点と目線の高さを入れる　② 見えている別の基準点を選び、画面中央の十字にその杭を重ねて「記録」';
 }
 function endFit() {
   fitOn = false; removeEventListener('deviceorientation', onOrient, true);
   if (fitStream) { fitStream.getTracks().forEach(t => t.stop()); fitStream = null; }
-  $('vid2').srcObject = null; showLoupe(false);
   $('vid').classList.remove('show'); $('xh').classList.remove('show'); $('fitui').classList.remove('show');
   $('bFit').classList.remove('on');
   controls.enabled = true; scene.background = new THREE.Color(0xf4f5f3);
-  corr.identity(); shots.length = 0; yawTrim = pitchTrim = 0;
+  corr.identity(); lastShot = null; yawTrim = pitchTrim = 0;
   camera.fov = 55; camera.updateProjectionMatrix();
 }
 
@@ -606,12 +543,6 @@ function initFit() {
       o.textContent = `${a.name}（設計追距 ${a.ds.toFixed(0)}）`; sel.appendChild(o); });
   }
   $('fitAt').selectedIndex = 0; $('fitTo').selectedIndex = 1;
-  // ★S29 立っている点を変えたら 記録を捨てて 狙う点を一番遠い点にし直す
-  $('fitAt').onchange = () => { shots.length = 0; corr.identity();
-    $('fitShots').textContent = '記録 0 点'; $('fitState').textContent = '未合わせ'; nextTarget(); };
-  $('cLoupe').onchange = e => showLoupe(e.target.checked);
-  $('loupeZ').onchange = sizeLoupe;
-  $('bPrint').onclick = printView;
   const zbox = $('fitZ'), ov = anchorZ();
   A.forEach((a, i) => {
     const d = document.createElement('div'); d.className = 'zrow';
@@ -631,9 +562,8 @@ function initFit() {
   $('bFit').onclick = () => { fitOn ? endFit() : startFit(); };
   $('fitEnd').onclick = endFit;
   $('fitTap').onclick = record;
-  $('fitReset').onclick = () => { corr.identity(); shots.length = 0; yawTrim = pitchTrim = 0;
-    $('fitYaw').value = 0; $('fitYawV').textContent = '0.00°'; $('fitShots').textContent = '記録 0 点';
-    nextTarget();
+  $('fitReset').onclick = () => { corr.identity(); lastShot = null; yawTrim = pitchTrim = 0;
+    $('fitYaw').value = 0; $('fitYawV').textContent = '0.00°';
     $('fitState').textContent = '未合わせ'; $('fitTip').textContent = '狙う点を選んで、十字に重ねて「記録」。'; };
   $('fitYaw').oninput = () => { const d = +$('fitYaw').value / 20;
     yawTrim = THREE.MathUtils.degToRad(d); $('fitYawV').textContent = d.toFixed(2) + '°'; };
@@ -647,69 +577,4 @@ function fitTick() {
   if (camera.fov !== fovCal) { camera.fov = fovCal; camera.updateProjectionMatrix(); }
   const t = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawTrim);
   camera.quaternion.copy(t.multiply(corr).multiply(fitQ));
-}
-
-
-// ---------- ★S29 ルーペ（十字まわりの拡大） ----------
-function sizeLoupe() {
-  const v = $('vid2'); if (!v) return;
-  const z = +($('loupeZ') ? $('loupeZ').value : 3) || 3;
-  v.style.width = innerWidth + 'px';   v.style.marginLeft = (-innerWidth / 2) + 'px';
-  v.style.height = innerHeight + 'px'; v.style.marginTop = (-innerHeight / 2) + 'px';
-  v.style.transform = 'scale(' + z + ')';
-  const m = $('loupeMag'); if (m) m.textContent = '×' + z + '　十字に杭を重ねる';
-}
-function showLoupe(on) {
-  $('loupe').classList.toggle('show', !!on && fitOn);
-  $('loupeMag').classList.toggle('show', !!on && fitOn);
-  if (on) sizeLoupe();
-}
-
-// ---------- ★S29 印刷（PC 向け） ----------
-// 画面を1枚の画像にする。現地合わせ中はカメラ映像も下に敷く
-function snapshot() {
-  renderer.render(scene, camera);                       // 直前に描き直してから取り出す
-  const c = renderer.domElement;
-  if (!fitOn) return c.toDataURL('image/png');
-  const o = document.createElement('canvas'); o.width = c.width; o.height = c.height;
-  const g = o.getContext('2d'), v = $('vid');
-  if (v && v.videoWidth) {                              // object-fit:cover と同じ切り出し
-    const s = Math.max(o.width / v.videoWidth, o.height / v.videoHeight);
-    const w = v.videoWidth * s, h = v.videoHeight * s;
-    g.drawImage(v, (o.width - w) / 2, (o.height - h) / 2, w, h);
-  } else { g.fillStyle = '#000'; g.fillRect(0, 0, o.width, o.height); }
-  g.drawImage(c, 0, 0);
-  return o.toDataURL('image/png');
-}
-
-function printView() {
-  const img = snapshot();
-  const on = Object.keys(meshes).filter(n => meshes[n].visible && !n.startsWith('線_'));
-  const ln = Object.keys(meshes).filter(n => meshes[n].visible && n.startsWith('線_'));
-  const d = new Date();
-  const ts = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-`
-    + `${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:`
-    + `${String(d.getMinutes()).padStart(2, '0')}`;
-  let slice = '—';
-  if ($('cSlice').checked) {
-    const a = M.axis[+$('sSlice').value];
-    slice = `${noText(toSv(a[0]))}（設計追距 ${a[0].toFixed(3)}）　厚み ${(+$('sThick').value / 10).toFixed(1)} m`;
-  }
-  const rows = [
-    ['工事', '二級河川塩田川 河川改修工事（その4）　左岸'],
-    ['範囲', `設計追加距離 ${M.range.lo.toFixed(3)}〜${M.range.hi.toFixed(3)}`],
-    ['断面（スライス）', slice],
-    ['表示中の部品', on.length ? on.join('／') : '（なし）'],
-    ['表示中の特徴線', ln.length ? ln.map(n => n.slice(2)).join('／') : '（なし）'],
-    ['座標系', M.origin.crs + `　ローカル原点 X=${M.origin.X0} Y=${M.origin.Y0}`],
-    ['出力日時', ts],
-  ];
-  const hudTxt = $('hud').classList.contains('show') ? $('hud').innerText.replace(/\n/g, '　') : '';
-  if (hudTxt) rows.splice(3, 0, ['画面の情報', hudTxt]);
-  const table = $('pInfo').checked
-    ? '<table>' + rows.map(r => `<tr><th style="width:22%">${r[0]}</th><td>${r[1]}</td></tr>`).join('') + '</table>'
-    : '';
-  $('printsheet').innerHTML =
-    `<h1>塩田川 その4 左岸 完成形　画面出力</h1><img src="${img}" alt="">${table}`;
-  setTimeout(() => window.print(), 60);
 }
