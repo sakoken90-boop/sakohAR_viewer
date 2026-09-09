@@ -201,8 +201,10 @@ input[type=range]{width:100%}
   <details style="margin-top:6px"><summary class="k" style="cursor:pointer">基準点の標高（現地実測値を入れる）</summary>
     <div id="fitZ" style="margin-top:6px"></div>
     <div class="row"><button class="btn" id="fitZSave" style="flex:1">保存</button>
-                    <button class="btn" id="fitZReset" style="flex:1">計画値に戻す</button></div>
-    <div class="tiny">この端末に保存されます。杭の頭の標高を入れてください。</div>
+                    <button class="btn" id="fitZReset" style="flex:1">元値に戻す</button></div>
+    <div class="tiny">★この端末だけに保存されます。全員に効かせたいときは
+      <b>出力\AR基準点_実測Z.csv</b> に書いて 作り直してください（AR（実寸）にも効きます）。
+      「計画値に戻す」は データに入っている元値に戻します。</div>
   </details>
 </div>
 

@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v11';  // ★S41 stale-while-revalidate。版を上げ忘れても次回は新しくなる
+const V = 'sd-viewer-v12';  // ★S42 実測Zをデータ既定に
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

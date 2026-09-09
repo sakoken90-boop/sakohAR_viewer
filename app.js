@@ -460,7 +460,9 @@ const ZKEY = 'sd_anchor_z', FKEY = 'sd_fov';
 function anchorZ() {
   let ov = {};
   try { ov = JSON.parse(localStorage.getItem(ZKEY) || '{}'); } catch (e) {}
-  return M.anchors.map(a => ({ ...a, z: (ov[a.name] != null ? +ov[a.name] : a.z_plan) }));
+  // ★S42 既定は a.z（AR基準点_実測Z.csv で作り直せば その値。無ければ計画値）
+  //   端末ごとの上書き（localStorage）があれば そちらが優先
+  return M.anchors.map(a => ({ ...a, z: (ov[a.name] != null ? +ov[a.name] : (a.z != null ? a.z : a.z_plan)) }));
 }
 
 function buildAnchors() { anchorGrp = new THREE.Group(); root.add(anchorGrp); redrawAnchors(); }
@@ -682,7 +684,7 @@ function initFit() {
   A.forEach((a, i) => {
     const d = document.createElement('div'); d.className = 'zrow';
     d.innerHTML = `<span>${a.name}</span><input type="number" step="0.001" data-n="${a.name}"
-      value="${ov[i].z.toFixed(3)}"><span class="k" style="width:auto">計画 ${a.z_plan.toFixed(3)}</span>`;
+      value="${ov[i].z.toFixed(3)}"><span class="k" style="width:auto">元値 ${(a.z != null ? a.z : a.z_plan).toFixed(3)}${a.z_meas ? '（実測）' : '（計画）'}</span>`;
     zbox.appendChild(d);
   });
   $('fitZSave').onclick = () => {
@@ -692,7 +694,8 @@ function initFit() {
   };
   $('fitZReset').onclick = () => {
     localStorage.removeItem(ZKEY); redrawAnchors();
-    zbox.querySelectorAll('input').forEach(i => { const a = A.find(x => x.name === i.dataset.n); i.value = a.z_plan.toFixed(3); });
+    zbox.querySelectorAll('input').forEach(i => { const a = A.find(x => x.name === i.dataset.n);
+      i.value = (a.z != null ? a.z : a.z_plan).toFixed(3); });
   };
   $('bFit').onclick = () => { fitOn ? endFit() : startFit(); };
   $('fitEnd').onclick = endFit;
