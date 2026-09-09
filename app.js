@@ -646,6 +646,11 @@ function initFit() {
   $('cLoupe').onchange = e => showLoupe(e.target.checked);
   $('loupeZ').onchange = sizeLoupe;
   $('bPrint').onclick = printView;
+  // ★S32 AR（実寸）で使う USDZ を切り替える
+  const swapUsdz = () => { $('arq').setAttribute('href',
+    $('uGround').checked ? 'model_ground.usdz'
+    : $('uBank').checked ? 'model_bank.usdz' : 'model.usdz'); };
+  $('uFull').onchange = swapUsdz; $('uGround').onchange = swapUsdz; $('uBank').onchange = swapUsdz;
   const zbox = $('fitZ'), ov = anchorZ();
   A.forEach((a, i) => {
     const d = document.createElement('div'); d.className = 'zrow';

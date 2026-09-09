@@ -148,6 +148,20 @@ input[type=range]{width:100%}
   </div>
 
   <div class="sec">
+    <h3>AR（実寸）で使うモデル</h3>
+    <div class="row"><label style="flex:none"><input type="radio" name="usdz" id="uFull" checked> 全体（既定）</label></div>
+    <div class="row"><label style="flex:none"><input type="radio" name="usdz" id="uGround"> ★天端で置く（datum 8.20）</label></div>
+    <div class="row"><label style="flex:none"><input type="radio" name="usdz" id="uBank"> ★水際で置く（datum 5.50）</label></div>
+    <div class="tiny">Quick Look は ★モデルの一番低い所を「検出した床」に乗せます。
+      だから <b>置く床の標高＝モデルの最下端</b> にした版を用意しました。
+      どちらも各基準点の足元に <b>ピンクの合わせ箱</b>（AR1 だけ大きい）が入っています。<br>
+      <b>天端で置く</b>…天端まわりの地面（現況 8.1〜8.7 m）に立つとき。天端・法肩・縦帯・階段・横帯が見えます。<br>
+      <b>水際で置く</b>…法尻まわりの低い所（現況 5.3〜6.0 m）に立つとき。
+      ★張ブロック・根固め・かごマットまで見えます（基礎・均しは埋設なので出ません）。<br>
+      <b>全体</b>…高さは合いません（天端が 4〜5 m 頭上）。形だけ見るとき。</div>
+  </div>
+
+  <div class="sec">
     <h3>印刷（PC 向け）</h3>
     <div class="row"><button class="btn" id="bPrint" style="flex:1">この画面を印刷</button></div>
     <div class="row"><label style="flex:none"><input type="checkbox" id="pInfo" checked> 情報の表を付ける</label></div>

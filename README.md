@@ -10,7 +10,8 @@ Android では現地で 1:1 の AR 表示もできます。
   index.html              画面と UI
   app.js                  three.js のビューア本体
   sd_model.json           形状と線形と測点（scripts\sd_viewer.py が作る・約 650 KB）
-  model.usdz              iPhone/iPad の AR Quick Look 用（実寸 1:1・約 0.8 MB）
+  model.usdz              iPhone/iPad の AR Quick Look 用（実寸 1:1・全体版）
+  model_ground.usdz       ★地面基準版（datum 8.200 m・合わせ箱つき・S32）
   AR基準点.csv / .sim     ★現地に設置する基準点6点（TS で出す用・cp932）
   manifest.webmanifest    ホーム画面に追加するための設定
   sw.js                   オフライン用（一度開けば電波が無くても見られる）
@@ -331,6 +332,40 @@ ARKit のトラッキングがそのまま効くので、置いたあと歩き�
   ★通信は iPhone のテザリングで足りる。事前キャッシュしておけば現地では不要
   ※外付けの RTK 受信機を web から読むことは iOS ではできない。
     cm 精度が要る場面は TS／GNSS 測量で。AR は形・納まり・干渉の確認まで
+```
+
+### ★地面基準版の USDZ ＋ 合わせ箱（S32）── Quick Look でも XYZ を決める
+
+Quick Look は「モデルの一番低い所」を検出した床に乗せる。
+★ならば モデルの最下端の標高 ＝ 置く地面の標高 にしてしまえばよい。
+
+```
+  model_ground.usdz   ★datum 8.200 m より下を切り落とした版（0.27 MB）
+                      各基準点の足元に ★ピンクの「合わせ箱」入り
+                      一辺 0.300 m（★AR1 だけ 0.500 m ＝ 下流端の目印）
+                      箱の底が床に接するので 鋲との重なりを見た目で判定できる
+  model.usdz          全体版（従来どおり。河床から天端まで）
+```
+
+使い方
+
+```
+  1) 「表示」→「AR（実寸）で使うモデル」で ★地面基準 を選ぶ
+  2) 「AR（実寸）」→ AR点まわりの地面を映して 床を検出させる
+  3) ★大きいピンクの箱（AR1）を AR1 の鋲に重ねる（ドラッグ）
+  4) ★小さい箱が AR2〜AR6 の鋲に乗るまで 2本指で回す
+  5) 触らない。歩いても ARKit が保つ
+```
+
+```
+  ★高さの誤差 ＝ 置いた地面の標高 − 8.200
+    AR点まわりの現況地盤高（横断図から）
+      AR1 8.21 ／ AR2 8.11 ／ AR3 8.08 ／ AR4 8.44 ／ AR5 8.62 ／ AR6 8.72
+    → AR1〜AR3 なら数 cm。AR5・AR6 側は 0.4〜0.5 m 高く出る
+  ★実測した地面標高で作り直せる
+      node scripts\sd_usdz.mjs 出力\Viewer\sd_model.json 出力\Viewer\model_ground.usdz --datum 8.35
+  ★datum 8.200 だと 大型張ブロック・基礎・均し・根固め・かごマットは消える
+    （8.2 より下）。護岸まで見たいときは datum 7.50 くらいにするか 全体版を使う
 ```
 
 ### ★Quick Look はモデルが 4〜5 m 頭上に出る（高さは合わない）

@@ -1,7 +1,7 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v5';   // ★S31 記録状態のチップ表示
+const V = 'sd-viewer-v7';   // ★S33 水際で置く版（datum 5.50）を追加
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
-              './model.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+              './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
