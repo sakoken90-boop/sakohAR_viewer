@@ -104,7 +104,8 @@ async function init() {
 
   bindUI(); buildAnchors(); initFit();
   $('sub').textContent = `三角形 ${M.parts.reduce((a, p) => a + p.f.length, 0).toLocaleString()}／`
-    + `設計追距 ${M.range.lo.toFixed(3)}〜${M.range.hi.toFixed(3)}`;
+    + `設計追距 ${M.range.lo.toFixed(3)}〜${M.range.hi.toFixed(3)}`
+    + (M.built ? `／★データ ${M.built}` : '');   // ★S41 どの版を見ているか分かるように
   $('crs').innerHTML = `${M.origin.crs}<br>ローカル原点 X=${M.origin.X0} Y=${M.origin.Y0}<br>${M.origin.note}`;
   $('msg').classList.add('hide');
   addEventListener('resize', onResize);
@@ -767,6 +768,7 @@ function printView() {
     ['表示中の部品', on.length ? on.join('／') : '（なし）'],
     ['表示中の特徴線', ln.length ? ln.map(n => n.slice(2)).join('／') : '（なし）'],
     ['座標系', M.origin.crs + `　ローカル原点 X=${M.origin.X0} Y=${M.origin.Y0}`],
+    ['データ作成', M.built || '—'],
     ['出力日時', ts],
   ];
   const hudTxt = $('hud').classList.contains('show') ? $('hud').innerText.replace(/\n/g, '　') : '';
