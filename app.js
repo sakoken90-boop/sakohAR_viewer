@@ -324,11 +324,22 @@ function clearMarks() { while (markGrp.children.length) markGrp.remove(markGrp.c
 let xrSession = null, hitSource = null, refSpace = null, reticle = null;
 let anchorW = null, heading = 0, zOff = 0, headingBase = 0;
 
+// ★S36 「基準の杭」は AR基準点（鋲）と 測点杭 の両方から選べる
+function arPoint() {
+  const v = $('anchor').value;
+  return v[0] === 'a' ? anchorZ()[+v.slice(1)] : M.stakes[+v.slice(1)];
+}
+
 function initAR() {
   const sel = $('anchor');
+  (M.anchors || []).forEach((a, i) => {          // ★鋲を先に並べる
+    const o = document.createElement('option');
+    o.value = 'a' + i; o.textContent = `★${a.name}（鋲・設計 ${a.ds.toFixed(0)}／離れ ${a.off}）`;
+    sel.appendChild(o);
+  });
   M.stakes.forEach((k, i) => {
     const o = document.createElement('option');
-    o.value = i; o.textContent = `${k.sv_no.replace('+00.000', '')}（設計 ${k.ds.toFixed(2)}）`;
+    o.value = 's' + i; o.textContent = `${k.sv_no.replace('+00.000', '')}（設計 ${k.ds.toFixed(2)}）`;
     sel.appendChild(o);
   });
   sel.selectedIndex = Math.min(3, M.stakes.length - 1);
@@ -351,13 +362,14 @@ function initAR() {
     }
     try { await startAR(); } catch (e) { alert('AR を開始できません：' + e); }
   };
+  $('anchor').onchange = () => { if (anchorW) arApply(); };
   $('arRot').oninput = () => { heading = headingBase + THREE.MathUtils.degToRad(+$('arRot').value); $('arRotV').textContent = (+$('arRot').value).toFixed(1) + '°'; arApply(); };
   $('arZ').oninput = () => { zOff = +$('arZ').value / 100; $('arZV').textContent = zOff.toFixed(2); arApply(); };
   $('bPlace').onclick = () => {
     if (!reticle.visible) { $('arTip').textContent = '床が認識できていません。少しゆっくり動かして輪郭を出してください。'; return; }
     anchorW = new THREE.Vector3().setFromMatrixPosition(reticle.matrix);
     arApply();
-    $('arTip').textContent = '置きました。次に、堤防の上流側の地面に向けて「② 上流へ向ける」を押してください。';
+    $('arTip').textContent = '置きました。次に、堤防の上流側の地面（できれば別の鋲）に向けて「② 向きを合わせる」を押してください。';
   };
   $('bHeading').onclick = () => {
     if (!anchorW) { $('arTip').textContent = '先に「① 足元に合わせる」を押してください。'; return; }
@@ -365,7 +377,7 @@ function initAR() {
     const tgt = new THREE.Vector3().setFromMatrixPosition(reticle.matrix);
     const d = tgt.clone().sub(anchorW); d.y = 0;
     if (d.length() < 0.6) { $('arTip').textContent = 'もう少し離れた地面に向けてください（1 m 以上）。'; return; }
-    const k = M.stakes[+$('anchor').value];
+    const k = arPoint();
     const a = nearestAxis(k.ds);
     const tl = new THREE.Vector3(Math.sin(a[3]), 0, -Math.cos(a[3]));   // 上流向き（世界系の向きに直す前）
     headingBase = Math.atan2(d.x, d.z) - Math.atan2(tl.x, tl.z);
@@ -383,7 +395,7 @@ function nearestAxis(sd) {
 
 function arApply() {
   if (!anchorW) return;
-  const k = M.stakes[+$('anchor').value];
+  const k = arPoint();
   const pl = new THREE.Vector3(k.x, k.z, -k.y);        // zup 適用後のローカル座標
   const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), heading);
   arRoot.quaternion.copy(q);

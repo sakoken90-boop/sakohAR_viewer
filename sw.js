@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v8';   // ★S35 AR基準点の表示切替
+const V = 'sd-viewer-v9';   // ★S36 WebXR の基準にAR基準点／合わせ箱を全版に
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
