@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v9';   // ★S36 WebXR の基準にAR基準点／合わせ箱を全版に
+const V = 'sd-viewer-v10';  // ★S37 合わせ箱→合わせ十字
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

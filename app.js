@@ -472,6 +472,15 @@ function redrawAnchors() {
     const h = 2.0;
     const g = new THREE.CylinderGeometry(0.035, 0.035, h, 8).rotateX(Math.PI / 2).translate(a.x, a.y, a.z + h / 2);
     anchorGrp.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xd23b2f })));
+    // ★S37 合わせ十字（地面に置く十字の的）。USDZ に入れているものと同じ形
+    const L = (a.name === 'AR1' ? 3.0 : 2.0), tn = nearestAxis(a.ds)[3];
+    const mt = new THREE.MeshBasicMaterial({ color: 0xe61ea0 });
+    for (const rot of [0, Math.PI / 2]) {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(L, 0.04, 0.01), mt);
+      b.position.set(a.x, a.y, a.z + 0.005);
+      b.rotation.z = -tn + rot;          // モデル座標は (東,北)。接線方位に合わせる
+      anchorGrp.add(b);
+    }
     const sp = label(a.name, a.z.toFixed(3) + ' m');
     sp.position.set(a.x, a.y, a.z + h + 1.2); sp.scale.set(6, 2.3, 1);
     anchorGrp.add(sp);
