@@ -150,23 +150,6 @@ input[type=range]{width:100%}
   </div>
 
   <div class="sec">
-    <h3>★基準点の標高（現地で入れる）</h3>
-    <div id="zbox2"></div>
-    <div class="row"><button class="btn g" id="zSave" style="flex:1">保存</button>
-                    <button class="btn" id="zReset" style="flex:1">元値に戻す</button></div>
-    <div class="row"><button class="btn" id="zOut" style="flex:1">書き出す</button>
-                    <button class="btn" id="zIn" style="flex:1">貼り付けて読み込む</button></div>
-    <textarea id="zCsv" rows="4" style="width:100%;font-size:11px;font-family:ui-monospace,Menlo,monospace;
-      border:1px solid var(--line);border-radius:6px;padding:5px;margin-top:4px" placeholder="ここに CSV が出ます／ここに貼り付けて「読み込む」"></textarea>
-    <div class="tiny">レベルで測った<b>鋲の頭の標高（T.P. m）</b>を入れて「保存」。
-      <b>現地合わせ（自作AR）には その場ですぐ効きます</b>（作り直し不要・この端末だけに保存）。<br>
-      「書き出す」で CSV になります。メールや AirDrop で PC に送って
-      <b>出力\AR基準点_実測Z.csv</b> に貼れば、次の作り直しで
-      <b>AR（実寸）と全員のビューア</b>にも効きます。</div>
-    <div class="tiny" id="zOff" style="margin-top:5px"></div>
-  </div>
-
-  <div class="sec">
     <h3>AR（実寸）で使うモデル</h3>
     <div class="row"><label style="flex:none"><input type="radio" name="usdz" id="uFull" checked> 全体（既定）</label></div>
     <div class="row"><label style="flex:none"><input type="radio" name="usdz" id="uGround"> ★天端で置く（datum 8.20）</label></div>
@@ -219,8 +202,9 @@ input[type=range]{width:100%}
     <div id="fitZ" style="margin-top:6px"></div>
     <div class="row"><button class="btn" id="fitZSave" style="flex:1">保存</button>
                     <button class="btn" id="fitZReset" style="flex:1">元値に戻す</button></div>
-    <div class="tiny">★この端末だけに保存されます（現地合わせには すぐ効きます）。
-      左の設定パネル「★基準点の標高（現地で入れる）」に 書き出し／読み込みがあります。</div>
+    <div class="tiny">★この端末だけに保存されます。全員に効かせたいときは
+      <b>出力\AR基準点_実測Z.csv</b> に書いて 作り直してください（AR（実寸）にも効きます）。
+      「計画値に戻す」は データに入っている元値に戻します。</div>
   </details>
 </div>
 
