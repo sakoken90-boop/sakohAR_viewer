@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v7';   // ★S33 水際で置く版（datum 5.50）を追加
+const V = 'sd-viewer-v8';   // ★S35 AR基準点の表示切替
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

@@ -25,6 +25,8 @@ const GROUPS = [
   ['階段工',     n => n.startsWith('階段_')],
   ['特徴線',     n => n.startsWith('線_')],
 ];
+// ★S35 上のどれにも入らない部品も 必ずチェックボックスを出す（AR基準点など）
+const GROUPED = (n) => GROUPS.some(([, test]) => test(n));
 const OFF = new Set(['かごマット2段_横断図', 'かごマット3段_横断図',
   '線_大型張ブロック', '線_縦帯コンクリート', '線_基礎コンクリートブロック',
   '線_均しコンクリート', '線_根固めブロック', '線_かごマット2段_平面図',
@@ -201,7 +203,7 @@ function allMats() { return [...matsFace, ...matsStr, ...Object.values(meshes).m
 
 function bindUI() {
   const box = $('parts');
-  for (const [gname, test] of GROUPS) {
+  for (const [gname, test] of GROUPS.concat([['その他', n => !GROUPED(n)]])) {
     const names = Object.keys(meshes).filter(test);
     if (!names.length) continue;
     const h = document.createElement('div'); h.className = 'grp'; h.textContent = gname; box.appendChild(h);
@@ -236,6 +238,7 @@ function bindUI() {
 
   $('cStakes').onchange = e => { stakeGrp.visible = e.target.checked; };
   $('cAxis').onchange = e => { axisLine.visible = e.target.checked; };
+  $('cAnchor').onchange = e => { anchorsOn = e.target.checked; anchorGrp.visible = anchorsOn; };
 
   $('bMeasure').onclick = () => {
     measureMode = !measureMode; $('bMeasure').classList.toggle('on', measureMode);
@@ -449,6 +452,7 @@ function anchorZ() {
 
 function buildAnchors() { anchorGrp = new THREE.Group(); root.add(anchorGrp); redrawAnchors(); }
 let fitSkip = null;      // ★S30 現地合わせ中、立っている点のポールは描かない
+let anchorsOn = true;    // ★S35 AR基準点（ポール＋名前）の表示
 function redrawAnchors() {
   while (anchorGrp.children.length) anchorGrp.remove(anchorGrp.children[0]);
   for (const a of anchorZ()) {
@@ -460,6 +464,7 @@ function redrawAnchors() {
     sp.position.set(a.x, a.y, a.z + h + 1.2); sp.scale.set(6, 2.3, 1);
     anchorGrp.add(sp);
   }
+  anchorGrp.visible = anchorsOn;      // ★S35 描き直しても表示状態を保つ
 }
 
 const camPos = () => {
