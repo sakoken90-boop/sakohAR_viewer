@@ -353,11 +353,6 @@ function initAR() {
   const a = document.createElement('a');
   const quickLook = a.relList && a.relList.supports && a.relList.supports('ar');
   if (quickLook) { $('bAR').textContent = 'AR（実寸）'; }
-  // ★S47 この端末で 下の版の選択が効くのかどうかを その場で出す
-  $('uPlat').innerHTML = quickLook
-    ? '★この端末は <b>iPhone / iPad</b> です。AR（実寸）は Quick Look で開くので、下の選択が効きます。'
-    : '★この端末は <b>Android など</b>です。AR は <b>WebXR</b>（鋲基準）で開くので、'
-      + '<b>下の選択は使いません</b>。全部品が はじめから正しい高さで出ます。';
 
   $('bAR').onclick = async () => {
     if (quickLook) { $('arq').click(); return; }      // iOS：Quick Look で 1:1 配置

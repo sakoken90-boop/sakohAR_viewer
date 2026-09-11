@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v16';  // ★S47 datum の制約は iOS だけ、と端末別に書き分けた
+const V = 'sd-viewer-v15';  // ★S46 既定を天端版に。全体版は高さを合わせられない旨を明示
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

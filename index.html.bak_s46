@@ -167,45 +167,21 @@ input[type=range]{width:100%}
   </div>
 
   <div class="sec">
-    <h3>AR（実寸）で使うモデル　<span style="font-weight:normal;font-size:.85em">― iPhone / iPad のみ</span></h3>
-    <div class="tiny" id="uPlat" style="margin-bottom:6px"></div>
-    <div class="row"><label style="flex:none"><input type="radio" name="usdz" id="uGround" checked> ★天端で置く（datum 8.20・既定）</label></div>
+    <h3>AR（実寸）で使うモデル</h3>
+    <div class="row"><label style="flex:none"><input type="radio" name="usdz" id="uFull" checked> 全体（既定）</label></div>
+    <div class="row"><label style="flex:none"><input type="radio" name="usdz" id="uGround"> ★天端で置く（datum 8.20）</label></div>
     <div class="row"><label style="flex:none"><input type="radio" name="usdz" id="uBank"> ★水際で置く（datum 5.50）</label></div>
-    <div class="row"><label style="flex:none"><input type="radio" name="usdz" id="uFull"> 全体 ★iOS では高さが合いません（形だけ）</label></div>
-    <div class="tiny" id="uWarn" style="display:none;margin-top:5px;padding:5px 7px;border:1px solid #a33;border-radius:4px;background:#2a1416">
-      ★<b>iPhone / iPad（AR Quick Look）では 全体版の高さを合わせられません。</b>
-      最下端（均しコン T.P. 4.005）が床に乗るので 天端が 4.4〜5.1 m 頭上に出ます。
-      Quick Look の 2本指は <b>上げる（levitate）専用</b>で、床より下へは沈められないため、
-      必要な「下げる」補正ができません。<br>
-      → iPhone / iPad で高さも合わせたいときは <b>天端で置く</b> か <b>水際で置く</b> を選んでください。<br>
-      ★<b>Android はこの制限を受けません。</b>鋲の標高そのものを床に合わせて置くので、
-      全体版のまま 基礎・均しコンまで 正しい高さで出ます。</div>
     <div class="row" style="margin-top:6px;border-top:1px solid #2a3442;padding-top:6px">
       <label style="flex:none"><input type="checkbox" id="uLock" checked> ★縮尺を固定する（ピンチ無効）</label></div>
-    <div class="tiny">★ここの選択が効くのは <b>iPhone / iPad（AR Quick Look）</b>のときだけです。
-      ★<b>Android（WebXR）は この選択を使いません。</b>「基準の杭」で選んだ鋲の標高を
-      そのまま床に合わせるので、はじめから正しい高さで出ます（下端基準ではありません）。<br>
-      Quick Look は ★モデルの一番低い所を「検出した床」に乗せます。
+    <div class="tiny">Quick Look は ★モデルの一番低い所を「検出した床」に乗せます。
       だから <b>置く床の標高＝モデルの最下端</b> にした版を用意しました。
       ★どの版にも 各基準点に <b>ピンクの合わせ十字</b>（腕 ±1.0 m・AR1 は ±1.5 m）が入っています。
       <b>十字の交点</b>を鋲に重ねてください。腕は 設計中心線の 測点方向／直角方向 を向いています。<br>
-      <b>天端で置く</b>…天端まわりの地面（現況 8.08〜8.72 m）に立つとき。
-      見えるのは <b>天端舗装・路肩・川裏法面・階段</b> と、縦帯 75 mm／横帯 35 mm の上端だけです。
-      ★大型張ブロック（天端 8.105）・かごマット・根固めは 8.20 より下なので出ません。<br>
-      <b>水際で置く</b>…法尻の低い所に立つとき。★張ブロック 2.6 m・かごマット全部・根固め上端まで見えます
-      （基礎・均しは埋設なので出ません）。<br>
-      <b>全体</b>…★iPhone / iPad では高さが合いません（上の赤枠）。形と並びだけを見るとき用。
-      Android では全体版が本命です。<br>
-      <b>★datum の選び方（iPhone / iPad のみ。これを外すと直せません）</b><br>
-      　★<b>立つ地面の標高 ≦ datum</b> になる版を選ぶこと。
-      　datum が地面より高ければ モデルは低めに出るので <b>持ち上げて直せます</b>。
-      　逆（datum が地面より低い）だと 高く出て <b>下げられません</b>。<br>
-      　★その裏返しとして <b>立っている所より下のものは見えません</b>（datum より下は切ってあるため）。
-      　★これも iPhone / iPad だけの制約です。
-      　datum 8.20 では ★大型張ブロック（天端 8.105）も かごマットも 消えます。
-      　護岸を見たいときは 護岸の高さまで降りて <b>水際で置く</b> を使ってください。<br>
-      　★水際で置く（5.50）で立つのは 下流側の低い所（NO.96・NO.97・IP14 付近、地盤 5.25〜5.42）。
-      　NO.99 付近は 法尻でも 6.1〜6.7 m あるので 5.50 版では合いません。<br>
+      <b>天端で置く</b>…天端まわりの地面（現況 8.1〜8.7 m）に立つとき。天端・法肩・縦帯・階段・横帯が見えます。<br>
+      <b>水際で置く</b>…法尻まわりの低い所（現況 5.3〜6.0 m）に立つとき。
+      ★張ブロック・根固め・かごマットまで見えます（基礎・均しは埋設なので出ません）。<br>
+      <b>全体</b>…置いた瞬間は 天端が 4〜5 m 頭上に出ますが、
+      ★2本指を上へドラッグすれば下げられます（S38）。護岸まで見えるので情報量は一番多いです。<br>
       <b>★縮尺を固定する</b>…Quick Look を <code>#allowsContentScaling=0</code> で開き、
       ★ピンチによる拡大縮小を無効にします（実寸 1:1 が崩れなくなる・Safari 12.2 以降）。<br>
       　★<b>この切替は Quick Look に入る前に決めます。</b>入ってからは変えられません（一度閉じて選び直す）。<br>
@@ -228,7 +204,7 @@ input[type=range]{width:100%}
   </div>
 </div>
 
-<a id="arq" rel="ar" href="model_ground.usdz#allowsContentScaling=0" style="position:fixed;left:-9999px" aria-hidden="true"><img src="icon-192.png" alt="AR" width="1" height="1"></a>
+<a id="arq" rel="ar" href="model.usdz#allowsContentScaling=0" style="position:fixed;left:-9999px" aria-hidden="true"><img src="icon-192.png" alt="AR" width="1" height="1"></a>
 
 <div id="hud"></div>
 
