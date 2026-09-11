@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v14';  // ★S45 AR（実寸）の縮尺固定（ピンチ無効）を入れた
+const V = 'sd-viewer-v13';  // ★S43 標高を現地入力できるようにした
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

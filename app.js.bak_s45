@@ -778,21 +778,10 @@ function initFit() {
   $('loupeZ').onchange = sizeLoupe;
   $('bPrint').onclick = printView;
   // ★S32 AR（実寸）で使う USDZ を切り替える
-  // ★S45 ピンチ（拡大縮小）を殺すかどうかも ここで href に付ける。
-  //      #allowsContentScaling=0 は AR Quick Look の URL フラグメント（Safari 12.2 以降）。
-  //      フラグメントはサーバに送られないので sw.js のキャッシュには影響しない。
-  const LKEY = 'sd_ar_lockscale';
-  const swapUsdz = () => {
-    const f = $('uGround').checked ? 'model_ground.usdz'
-            : $('uBank').checked   ? 'model_bank.usdz' : 'model.usdz';
-    const lock = $('uLock').checked;
-    try { localStorage.setItem(LKEY, lock ? '1' : '0'); } catch (e) {}
-    $('arq').setAttribute('href', f + (lock ? '#allowsContentScaling=0' : ''));
-  };
-  try { $('uLock').checked = (localStorage.getItem(LKEY) !== '0'); } catch (e) {}   // 既定は固定する
+  const swapUsdz = () => { $('arq').setAttribute('href',
+    $('uGround').checked ? 'model_ground.usdz'
+    : $('uBank').checked ? 'model_bank.usdz' : 'model.usdz'); };
   $('uFull').onchange = swapUsdz; $('uGround').onchange = swapUsdz; $('uBank').onchange = swapUsdz;
-  $('uLock').onchange = swapUsdz;
-  swapUsdz();
   // ★S43 実測標高を現地で入れる。現地合わせ用と設定パネル用の2か所に同じ表を出す
   initZ(A);
   $('bFit').onclick = () => { fitOn ? endFit() : startFit(); };

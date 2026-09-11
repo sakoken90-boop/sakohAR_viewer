@@ -171,8 +171,6 @@ input[type=range]{width:100%}
     <div class="row"><label style="flex:none"><input type="radio" name="usdz" id="uFull" checked> 全体（既定）</label></div>
     <div class="row"><label style="flex:none"><input type="radio" name="usdz" id="uGround"> ★天端で置く（datum 8.20）</label></div>
     <div class="row"><label style="flex:none"><input type="radio" name="usdz" id="uBank"> ★水際で置く（datum 5.50）</label></div>
-    <div class="row" style="margin-top:6px;border-top:1px solid #2a3442;padding-top:6px">
-      <label style="flex:none"><input type="checkbox" id="uLock" checked> ★縮尺を固定する（ピンチ無効）</label></div>
     <div class="tiny">Quick Look は ★モデルの一番低い所を「検出した床」に乗せます。
       だから <b>置く床の標高＝モデルの最下端</b> にした版を用意しました。
       ★どの版にも 各基準点に <b>ピンクの合わせ十字</b>（腕 ±1.0 m・AR1 は ±1.5 m）が入っています。
@@ -180,14 +178,7 @@ input[type=range]{width:100%}
       <b>天端で置く</b>…天端まわりの地面（現況 8.1〜8.7 m）に立つとき。天端・法肩・縦帯・階段・横帯が見えます。<br>
       <b>水際で置く</b>…法尻まわりの低い所（現況 5.3〜6.0 m）に立つとき。
       ★張ブロック・根固め・かごマットまで見えます（基礎・均しは埋設なので出ません）。<br>
-      <b>全体</b>…置いた瞬間は 天端が 4〜5 m 頭上に出ますが、
-      ★2本指を上へドラッグすれば下げられます（S38）。護岸まで見えるので情報量は一番多いです。<br>
-      <b>★縮尺を固定する</b>…Quick Look を <code>#allowsContentScaling=0</code> で開き、
-      ★ピンチによる拡大縮小を無効にします（実寸 1:1 が崩れなくなる・Safari 12.2 以降）。<br>
-      　★<b>この切替は Quick Look に入る前に決めます。</b>入ってからは変えられません（一度閉じて選び直す）。<br>
-      　★<b>実機で確かめること</b>：ピンチと高さ合わせ（2本指を上へドラッグ）は どちらも2本指です。
-      　固定すると高さ合わせまで効かなくなる場合は ★チェックを外してください（高さを優先）。<br>
-      　★縮尺が崩れていないかは <b>合わせ十字の腕（片側ちょうど 1.000 m）</b>をコンベックスと見比べれば確かめられます。</div>
+      <b>全体</b>…高さは合いません（天端が 4〜5 m 頭上）。形だけ見るとき。</div>
   </div>
 
   <div class="sec">
@@ -204,7 +195,7 @@ input[type=range]{width:100%}
   </div>
 </div>
 
-<a id="arq" rel="ar" href="model.usdz#allowsContentScaling=0" style="position:fixed;left:-9999px" aria-hidden="true"><img src="icon-192.png" alt="AR" width="1" height="1"></a>
+<a id="arq" rel="ar" href="model.usdz" style="position:fixed;left:-9999px" aria-hidden="true"><img src="icon-192.png" alt="AR" width="1" height="1"></a>
 
 <div id="hud"></div>
 
