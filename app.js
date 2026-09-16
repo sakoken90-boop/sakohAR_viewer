@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 22;                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
+const APP_V = 23;                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
 let home = null;                   // ★S58 起動時のカメラ（「全体」で戻る先）
 let measureMode = false; const picks = [];
 const planes = [new THREE.Plane(), new THREE.Plane()];
@@ -33,7 +33,7 @@ const OFF = new Set(['かごマット2段_横断図', 'かごマット3段_横�
   '線_大型張ブロック', '線_縦帯コンクリート', '線_基礎コンクリートブロック',
   '線_均しコンクリート', '線_根固めブロック', '線_かごマット2段_平面図',
   '線_かごマット3段_平面図', '線_かごマット2段_横断図', '線_かごマット3段_横断図',
-  '線_階段_本体', '線_階段_小口止工', '線_階段_縦帯工', '線_横帯工',
+  '線_階段_本体', '線_階段_小口止工', '線_横帯工',
   'AR基準点']);          // ★S30 モデル側のポールは USDZ／SketchUp 用。
                         //    ビューアは app.js が自前で描くので既定 OFF（二重＋視界を塞ぐ）
 
