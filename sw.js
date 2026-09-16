@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v18';  // ★S57 ズームを 指の位置に向かって寄るようにした（app.js 更新）
+const V = 'sd-viewer-v19';  // ★S58 ズームの＋−ボタンを足した。副題の「★アプリ v19」で入れ替わりを確認できる
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

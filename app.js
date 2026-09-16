@@ -13,6 +13,8 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
+const APP_V = 19;                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
+let home = null;                   // ★S58 起動時のカメラ（「全体」で戻る先）
 let measureMode = false; const picks = [];
 const planes = [new THREE.Plane(), new THREE.Plane()];
 
@@ -110,11 +112,13 @@ async function init() {
   controls.maxDistance = Math.max(600, sz.length() * 4);   // 引きすぎて見失うのを止める
   camera.position.set(c.x + sz.x * 0.35, c.y + sz.length() * 0.28, c.z + sz.length() * 0.45);
   camera.lookAt(c); controls.update();
+  home = { pos: camera.position.clone(), target: controls.target.clone() };   // ★S58
 
   bindUI(); buildAnchors(); initFit();
   $('sub').textContent = `三角形 ${M.parts.reduce((a, p) => a + p.f.length, 0).toLocaleString()}／`
     + `設計追距 ${M.range.lo.toFixed(3)}〜${M.range.hi.toFixed(3)}`
-    + (M.built ? `／★データ ${M.built}` : '');   // ★S41 どの版を見ているか分かるように
+    + (M.built ? `／★データ ${M.built}` : '')
+    + `／★アプリ v${APP_V}`;   // ★S41/S58 どの版を見ているか分かるように
   $('crs').innerHTML = `${M.origin.crs}<br>ローカル原点 X=${M.origin.X0} Y=${M.origin.Y0}<br>${M.origin.note}`;
   $('msg').classList.add('hide');
   addEventListener('resize', onResize);
@@ -227,6 +231,21 @@ function bindUI() {
       box.appendChild(row);
     }
   }
+  // ★S58 ズームのボタン。ピンチ／ホイールが効かない端末でも これなら確実に寄れる
+  const zoomBy = (f) => {
+    const off = camera.position.clone().sub(controls.target);
+    const d = Math.min(Math.max(off.length() * f, controls.minDistance), controls.maxDistance);
+    camera.position.copy(controls.target).add(off.setLength(d));
+    controls.update();
+  };
+  $('zmIn').onclick = () => zoomBy(0.6);     // 1回で 40% 寄る
+  $('zmOut').onclick = () => zoomBy(1 / 0.6);
+  $('zmFit').onclick = () => {
+    if (!home) return;
+    camera.position.copy(home.pos); controls.target.copy(home.target); controls.update();
+    hud('');
+  };
+
   $('bAll').onclick = () => setAll(true);
   $('bNone').onclick = () => setAll(false);
   $('bPanel').onclick = () => { $('sheet').classList.toggle('open'); $('bPanel').classList.toggle('on'); };
@@ -284,6 +303,8 @@ function updateSlice() {
 }
 
 function hud(html) { const h = $('hud'); h.innerHTML = html; h.classList.toggle('show', !!html); }
+// ★S58 現地合わせ／AR 中は ズームボタンを隠す（画面を塞がないように）
+function zoomUI(on) { const z = $('zoomui'); if (z) z.classList.toggle('hide', !on); }
 
 // ---------- 計測・情報 ----------
 let downXY = null;
@@ -453,7 +474,7 @@ async function startAR() {
   const viewer = await session.requestReferenceSpace('viewer');
   hitSource = await session.requestHitTestSource({ space: viewer });
 
-  scene.background = null; controls.enabled = false;
+  scene.background = null; controls.enabled = false; zoomUI(false);   // ★S58
   $('sheet').classList.remove('open'); $('bPanel').classList.remove('on');
   $('arui').classList.add('show'); $('bAR').textContent = 'AR終了'; $('bAR').classList.add('on');
   stakeGrp.visible = false;
@@ -461,7 +482,7 @@ async function startAR() {
 
   session.addEventListener('end', () => {
     xrSession = null; hitSource = null; reticle.visible = false;
-    scene.background = new THREE.Color(0xf4f5f3); controls.enabled = true;
+    scene.background = new THREE.Color(0xf4f5f3); controls.enabled = true; zoomUI(true);   // ★S58
     arRoot.position.set(0, 0, 0); arRoot.quaternion.identity();
     anchorW = null; heading = 0; headingBase = 0; zOff = 0;
     $('arui').classList.remove('show'); $('bAR').textContent = 'AR'; $('bAR').classList.remove('on');
@@ -664,6 +685,7 @@ async function startFit() {
     fitStream = await navigator.mediaDevices.getUserMedia(
       { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 } }, audio: false });
   } catch (e) { alert('カメラを使えません：' + e.message + '\nHTTPS で開いているか確認してください。'); return; }
+  zoomUI(false);                                    // ★S58 現地合わせ中は隠す
   const v = $('vid'); v.srcObject = fitStream; await v.play().catch(() => {});
   const v2 = $('vid2'); v2.srcObject = fitStream; v2.play().catch(() => {});   // ★S29 ルーペ
   if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) {
@@ -684,7 +706,8 @@ async function startFit() {
     + '③ もう1〜2点でも記録すると 平均が効く（ルーペで拡大できます）';
 }
 function endFit() {
-  fitOn = false; removeEventListener('deviceorientation', onOrient, true);
+  fitOn = false; zoomUI(true);                      // ★S58
+  removeEventListener('deviceorientation', onOrient, true);
   if (fitStream) { fitStream.getTracks().forEach(t => t.stop()); fitStream = null; }
   $('vid2').srcObject = null; showLoupe(false);
   fitSkip = null; redrawAnchors();                  // ★S30 元に戻す

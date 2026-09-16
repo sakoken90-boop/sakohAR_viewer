@@ -85,6 +85,13 @@ select,input[type=number]{padding:6px;border:1px solid var(--line);border-radius
 .sw{width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.2);flex:none}
 input[type=range]{width:100%}
 .mono{font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+/* ★S58 ズームのボタン（ピンチが効かない・効きが弱いときの逃げ道） */
+#zoomui{position:fixed;right:8px;top:50%;transform:translateY(-50%);z-index:8;
+  display:flex;flex-direction:column;gap:6px}
+#zoomui .btn{width:46px;height:46px;padding:0;font-size:18px;font-weight:700;
+  background:rgba(255,255,255,.94)}
+#zoomui .btn.sm{height:34px;font-size:12px;font-weight:400}
+#zoomui.hide{display:none}
 #hud{position:fixed;left:8px;bottom:8px;z-index:8;background:rgba(255,255,255,.94);
   border:1px solid var(--line);border-radius:10px;padding:8px 10px;max-width:min(420px,calc(100vw - 16px));
   font-size:12px;display:none}
@@ -229,6 +236,12 @@ input[type=range]{width:100%}
 </div>
 
 <a id="arq" rel="ar" href="model_ground.usdz#allowsContentScaling=0" style="position:fixed;left:-9999px" aria-hidden="true"><img src="icon-192.png" alt="AR" width="1" height="1"></a>
+
+<div id="zoomui">
+  <button class="btn" id="zmIn" aria-label="寄る">＋</button>
+  <button class="btn" id="zmOut" aria-label="引く">−</button>
+  <button class="btn sm" id="zmFit" aria-label="全体">全体</button>
+</div>
 
 <div id="hud"></div>
 
