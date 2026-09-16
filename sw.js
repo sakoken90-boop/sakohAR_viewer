@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v17';  // ★S55 階段部の基礎・均しをつなぎ 階段_縦帯工 を足した（モデル更新）
+const V = 'sd-viewer-v18';  // ★S57 ズームを 指の位置に向かって寄るようにした（app.js 更新）
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

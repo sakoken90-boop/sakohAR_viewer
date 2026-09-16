@@ -99,6 +99,15 @@ async function init() {
   const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
   controls = new OrbitControls(camera, renderer.domElement);
   controls.target.copy(c); controls.enableDamping = true; controls.dampingFactor = 0.12;
+  // ★S57 ズームが効かない件
+  //   OrbitControls の既定は「注視点（controls.target）に向かって寄る」。
+  //   このモデルは 195 m の細長い堤防なので、target が真ん中に居るかぎり
+  //   端を見ているときに寄っても 真ん中に引き戻される ＝ 効いていないように見える。
+  //   ★zoomToCursor で 指（マウス）の位置に向かって寄るようにする。
+  controls.zoomToCursor = true;
+  controls.zoomSpeed = 1.6;          // ホイール・ピンチとも 既定 1.0 より速く
+  controls.minDistance = 0.5;        // 寄りすぎて面に埋まるのを止める
+  controls.maxDistance = Math.max(600, sz.length() * 4);   // 引きすぎて見失うのを止める
   camera.position.set(c.x + sz.x * 0.35, c.y + sz.length() * 0.28, c.z + sz.length() * 0.45);
   camera.lookAt(c); controls.update();
 
@@ -279,6 +288,23 @@ function hud(html) { const h = $('hud'); h.innerHTML = html; h.classList.toggle(
 // ---------- 計測・情報 ----------
 let downXY = null;
 function onDown(e) { if (renderer.xr.isPresenting) return; downXY = [e.clientX, e.clientY]; }
+
+// ★S57 ダブルタップ（ダブルクリック）で その点を注視点にする
+//   zoomToCursor で寄れるようになっても、回転の中心は target のままなので、
+//   端の方を見ているときに回すと 大きく振られる。見たい所を target に移せば
+//   その場で回せて そこを中心に寄れる。
+let lastTap = 0, lastTapXY = [0, 0];
+function reTarget(p) {
+  raycaster.setFromCamera(p, camera);
+  const tg = Object.values(meshes).filter(o => o.visible && o.isMesh);
+  const hit = raycaster.intersectObjects(tg, false)[0];
+  if (!hit) return false;
+  controls.target.copy(hit.point);
+  controls.update();
+  hud('ここを中心にしました。この点に向かって回転・ズームできます。');
+  return true;
+}
+
 function onUp(e) {
   if (renderer.xr.isPresenting || !downXY) return;
   const moved = Math.hypot(e.clientX - downXY[0], e.clientY - downXY[1]); downXY = null;
@@ -287,6 +313,13 @@ function onUp(e) {
   const p = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1,
                               -((e.clientY - r.top) / r.height) * 2 + 1);
   if (fitOn) { record(p); return; }        // 現地合わせ中は「狙い」の記録
+  // ★S57 計測中でなければ、ダブルタップを 注視点の移動として拾う
+  if (!measureMode) {
+    const now = performance.now();
+    const near = Math.hypot(e.clientX - lastTapXY[0], e.clientY - lastTapXY[1]) < 24;
+    if (now - lastTap < 350 && near) { lastTap = 0; if (reTarget(p)) return; }
+    lastTap = now; lastTapXY = [e.clientX, e.clientY];
+  }
   raycaster.setFromCamera(p, camera);
   const targets = Object.values(meshes).filter(o => o.visible && o.isMesh);
   const hits = raycaster.intersectObjects(targets, false);
