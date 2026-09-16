@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 19;                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
+const APP_V = 20;                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
 let home = null;                   // ★S58 起動時のカメラ（「全体」で戻る先）
 let measureMode = false; const picks = [];
 const planes = [new THREE.Plane(), new THREE.Plane()];
@@ -138,6 +138,7 @@ function tick(time, frame) {
   if (frame) arFrame(frame);
   if (fitOn) fitTick();
   else if (!renderer.xr.isPresenting) controls && controls.update();
+  sizeMarks();                       // ★S59 計測点を いつも同じ大きさに見せる
   renderer.render(scene, camera);
 }
 
@@ -367,10 +368,27 @@ function onUp(e) {
   picks.length = 0;
   setTimeout(clearMarks, 6000);
 }
+// ★S59 計測のクリック点
+//   これまでは 半径 0.35 m（直径 0.70 m）の球を そのまま置いていた。
+//   張ブロックの厚みが 0.12 m なので 寄るほど 球で狙った点が隠れる。
+//   ★画面上の大きさを一定（半径 MARK_PX ピクセル）にして、寄っても大きくならないようにした。
+const MARK_PX = 4.5;            // 画面上の半径（ピクセル）。直径 9 px くらいの点
 function mark(m) {
-  const s = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 12),
+  const s = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8),
     new THREE.MeshBasicMaterial({ color: 0xd23b2f, depthTest: false }));
   s.position.set(m.e, m.n, m.z); s.renderOrder = 9; markGrp.add(s);
+  sizeMarks();
+}
+// ★毎フレーム 大きさを直す（カメラからの距離に比例させる）
+const _mp = new THREE.Vector3();
+function sizeMarks() {
+  if (!markGrp || markGrp.children.length === 0) return;
+  const H = (renderer.domElement.clientHeight || innerHeight);
+  const k = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / H * MARK_PX;
+  for (const s of markGrp.children) {
+    s.getWorldPosition(_mp);
+    s.scale.setScalar(Math.max(0.005, _mp.distanceTo(camera.position) * k));
+  }
 }
 function clearMarks() { while (markGrp.children.length) markGrp.remove(markGrp.children[0]); picks.length = 0; }
 

@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v19';  // ★S58 ズームの＋−ボタンを足した。副題の「★アプリ v19」で入れ替わりを確認できる
+const V = 'sd-viewer-v20';  // ★S59 計測のクリック点を 画面上いつも同じ大きさの小さい点にした
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
