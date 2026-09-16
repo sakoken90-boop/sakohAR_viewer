@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 20;                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
+const APP_V = 21;                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
 let home = null;                   // ★S58 起動時のカメラ（「全体」で戻る先）
 let measureMode = false; const picks = [];
 const planes = [new THREE.Plane(), new THREE.Plane()];
@@ -245,6 +245,24 @@ function bindUI() {
     if (!home) return;
     camera.position.copy(home.pos); controls.target.copy(home.target); controls.update();
     hud('');
+  };
+
+  // ★S60 最新に更新（キャッシュと Service Worker を消して読み直す）
+  //   キャッシュが入れ替わらないときの 逃げ道。localStorage は触らないので
+  //   現地で入れた基準点の標高は残る。
+  if ($('bUpdate')) $('bUpdate').onclick = async () => {
+    $('bUpdate').textContent = '更新しています…';
+    try {
+      if (window.caches) {
+        const ks = await caches.keys();
+        await Promise.all(ks.map(k => caches.delete(k)));
+      }
+      if (navigator.serviceWorker) {
+        const rs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(rs.map(r => r.unregister()));
+      }
+    } catch (e) {}
+    location.reload();
   };
 
   $('bAll').onclick = () => setAll(true);
