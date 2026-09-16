@@ -36,35 +36,45 @@ Android では現地で 1:1 の AR 表示もできます。
 ★かごマットは **平面図案（オリーブ）と横断図案（オレンジ）の2つ**が入っています。
 どちらが正かは未確定です（引き継ぎ書 §8-c）。現地で見比べて監督員と決めてください。
 
-## GitHub Pages で公開する手順
+## ★公開先（公開済み）
 
-1. GitHub で新しいリポジトリを作る（例：`shiotagawa-viewer`）。**Public** にする
-2. このフォルダの中身（`index.html` など7ファイル）をリポジトリ直下にアップロードする
-   - ブラウザで「Add file」→「Upload files」にドラッグ＆ドロップでよい
-3. リポジトリの **Settings → Pages** を開く
-4. Source を「Deploy from a branch」、Branch を `main` / `/ (root)` にして Save
-5. 1〜2分待つと `https://<ユーザー名>.github.io/shiotagawa-viewer/` で開ける
+```
+  現場で開く URL   ★https://sakoken90-boop.github.io/sakohAR_viewer/
+  リポジトリ       github.com/sakoken90-boop/sakohAR_viewer（Public・ブランチ main）
+  手元のクローン   ★D:\02 .ソフト関係\SakohARviewer\sakohAR_viewer
+  Pages の設定     Deploy from a branch ／ main ／ /(root)
+```
 
 ★AR とカメラは HTTPS でないと動きません。GitHub Pages は HTTPS なので大丈夫です。
 
-### ★更新するとき（2回目以降）
-
-```
-  1) 変わったファイルだけ上書きアップロードする
-  2) ★sw.js の 1行目 const V = 'sd-viewer-vN' の N を必ず上げる
-     ← 上げないと、端末が古いキャッシュ（前のモデル）を出し続けて更新が反映されない
-  3) 端末側は 開き直せば入れ替わる。入れ替わらないときは
-     Safari → 設定 → 履歴とWebサイトデータを消去、または ホーム画面のPWAを削除して入れ直す
-```
-
-```
-  S26 で変わったファイル  sd_model.json ／ model.usdz ／ sw.js ／ README.md
-                          （index.html・app.js は変わっていない）
-  sw.js  sd-viewer-v1 → ★sd-viewer-v2 に上げてある
-```
-
 QR コードは、上の URL を QR 作成サービスに入れて作ってください。
 現場で配るときは、印刷して詰所に貼っておくのが手軽です。
+
+### ★更新するとき
+
+```
+  1) DXF塩田川\ で 作り直し.bat を回す（sd_model.json と USDZ 3本ができる）
+  2) 変わったファイルを ★手元のクローン（上の D:\…）にコピーする
+  3) ★sw.js の 1行目 const V = 'sd-viewer-vN' の N を必ず上げる
+     ← 上げないと、端末が古いキャッシュ（前のモデル）を出し続けて更新が反映されない
+  4) クローンのフォルダで
+        git add -A
+        git commit -m "モデル更新（Sxx）"
+        git push
+     → 1〜2分で Pages に反映される
+  5) 端末側は 開き直せば入れ替わる。入れ替わらないときは
+     Safari → 設定 → 履歴とWebサイトデータを消去、または ホーム画面のPWAを削除して入れ直す
+  ★画面の題名の下「データ ○○」の日時で 入れ替わったか確認できる
+```
+
+```
+  ★S55 で変わったファイル
+     sd_model.json ／ model.usdz ／ model_bank.usdz ／ app.js ／ sw.js
+     （index.html は変わっていない。model_ground.usdz は中身が同じ）
+  sw.js  sd-viewer-v16 → ★sd-viewer-v17 に上げてある
+  中身   階段部の 基礎コンクリート・均しコンクリートを 階段の下で つないだ。
+         階段部の縦帯工（B=250）を足した（S54）
+```
 
 ## ★★どちらを使うか（2つは独立。つなげて使うものではない）
 
