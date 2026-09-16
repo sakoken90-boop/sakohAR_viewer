@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 23;                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
+const APP_V = 24;                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
 let home = null;                   // ★S58 起動時のカメラ（「全体」で戻る先）
 let measureMode = false; const picks = [];
 const planes = [new THREE.Plane(), new THREE.Plane()];
@@ -94,7 +94,7 @@ async function init() {
   zup = new THREE.Group(); zup.rotation.x = -Math.PI / 2; arRoot.add(zup);
   root = new THREE.Group(); zup.add(root);
 
-  buildParts(); buildAxis(); buildStakes();
+  buildParts(); buildAxis(); buildStakes(); buildSnap();   // ★S63
   markGrp = new THREE.Group(); root.add(markGrp);
 
   const box = new THREE.Box3().setFromObject(root);
@@ -311,8 +311,16 @@ function bindUI() {
 
   $('bMeasure').onclick = () => {
     measureMode = !measureMode; $('bMeasure').classList.toggle('on', measureMode);
-    clearMarks(); hud(measureMode ? '計測モード：2点をタップしてください。' : '');
+    clearMarks();
+    hud(measureMode ? ('計測モード：2点をタップしてください。'
+        + (snapOn ? '<br><span class="k">★特徴線の節点（法肩・天端・法尻・ブロックの角など）に吸い付きます。'
+                    + '外すときは 表示 →「計測」→ スナップ の目を外す</span>' : '')) : '');
   };
+  // ★S63 スナップの入／切
+  if ($('cSnap')) {
+    $('cSnap').checked = snapOn;
+    $('cSnap').onchange = () => { snapOn = $('cSnap').checked; };
+  }
   renderer.domElement.addEventListener('pointerdown', onDown);
   renderer.domElement.addEventListener('pointerup', onUp);
 }
@@ -384,29 +392,129 @@ function onUp(e) {
   raycaster.setFromCamera(p, camera);
   const targets = Object.values(meshes).filter(o => o.visible && o.isMesh);
   const hits = raycaster.intersectObjects(targets, false);
-  if (!hits.length) { if (!measureMode) hud(''); return; }
-  const w = hits[0].point.clone(); root.worldToLocal(w);   // モデル座標へ
-  const m = { e: w.x, n: w.y, z: w.z };
+  // ★S63 計測中は まず 特徴線の節点／線上に吸い付く（面より優先）
+  const sn = measureMode ? findSnap(e.clientX - r.left, e.clientY - r.top) : null;
+  if (!sn && !hits.length) { if (!measureMode) hud(''); return; }
+  let m, src;
+  if (sn) {
+    m = sn.m; src = `★${sn.kind}　${sn.name.replace(/^線_/, '')}`;
+  } else {
+    const w = hits[0].point.clone(); root.worldToLocal(w);   // モデル座標へ
+    m = { e: w.x, n: w.y, z: w.z }; src = hits[0].object.name;
+  }
   const st = station(m.e, m.n);
   const sv = toSv(st.s);
   const info = `<b>${noText(sv)}</b>　離れ <span class="mono">${F(Math.abs(st.off))}</span> m`
     + `（${st.off < 0 ? '左岸' : '右岸'}）　標高 <span class="mono">${F(m.z)}</span> m`
-    + `<br><span class="k">設計追距 ${F(st.s)}／${hits[0].object.name}`
+    + `<br><span class="k">設計追距 ${F(st.s)}／${src}`
     + `／実座標 X=${F(m.n + M.origin.X0)} Y=${F(m.e + M.origin.Y0)}</span>`;
   if (!measureMode) { hud(info); return; }
-  picks.push({ m, st, sv });
-  mark(m);
+  picks.push({ m, st, sv, src });
+  mark(m, !!sn);
   if (picks.length === 1) { hud(info + '<br>2点目をタップしてください。'); return; }
   const a = picks[0].m, b = picks[1].m;
   const dh = Math.hypot(b.e - a.e, b.n - a.n), dz = b.z - a.z;
   hud(`<b>計測</b>　水平 <span class="mono">${F(dh)}</span> m　`
     + `比高 <span class="mono">${dz >= 0 ? '+' : ''}${F(dz)}</span> m　`
     + `斜距離 <span class="mono">${F(Math.hypot(dh, dz))}</span> m`
-    + `<br><span class="k">① ${noText(picks[0].sv)} 離れ ${F(Math.abs(picks[0].st.off))} 標高 ${F(a.z)}`
-    + `<br>② ${noText(picks[1].sv)} 離れ ${F(Math.abs(picks[1].st.off))} 標高 ${F(b.z)}</span>`);
+    + `<br><span class="k">① ${noText(picks[0].sv)} 離れ ${F(Math.abs(picks[0].st.off))} 標高 ${F(a.z)}　${picks[0].src}`
+    + `<br>② ${noText(picks[1].sv)} 離れ ${F(Math.abs(picks[1].st.off))} 標高 ${F(b.z)}　${picks[1].src}</span>`);
   picks.length = 0;
   setTimeout(clearMarks, 6000);
 }
+// ★S63 計測のスナップ（特徴線の 節点 と 線上）
+//   特徴線の節点は そのまま ★出来形計測対象点（法肩・天端頂点・天端外縁・法尻…
+//   張ブロックや基礎の角）なので、そこに吸い付けば 手で狙うより ずっと正確に測れる。
+//   面をそのまま拾うと 三角形のどこか になり、0.01 m 単位で ばらつく。
+let snapOn = true;
+let SNAP = null;         // {p: Float32Array(xyz…), li: Int32Array(線の番号), end: Uint8Array, names: []}
+const SNAP_PX = 22;      // 節点に吸い付く画面上の半径（px）
+const SNAP_LPX = 14;     // 線に吸い付く半径（px）
+
+function buildSnap() {
+  const xs = [], li = [], en = [], names = [];
+  M.lines.forEach((l, k) => {
+    names.push(l.name);
+    for (const poly of l.p) {
+      for (let i = 0; i < poly.length; i++) {
+        xs.push(poly[i][0], poly[i][1], poly[i][2]);
+        li.push(k); en.push(i === 0 || i === poly.length - 1 ? 1 : 0);
+      }
+    }
+  });
+  SNAP = { p: new Float32Array(xs), li: Int32Array.from(li), end: Uint8Array.from(en), names };
+}
+
+const _s1 = new THREE.Vector3(), _s2 = new THREE.Vector3(), _s3 = new THREE.Vector3();
+let _sw = 0, _sh = 0;      // ★画面の大きさは findSnap の頭で1回だけ読む
+// 画面座標（px）に落とす。カメラの後ろなら null
+//   ★getBoundingClientRect() をここで呼ぶと 1万回のレイアウト読み取りになって
+//     端末で固まる。必ず外で読んで _sw/_sh に入れておくこと
+function toScreen(v, out) {
+  _s3.copy(v).applyMatrix4(root.matrixWorld);
+  const cam = _s3.distanceTo(camera.position);
+  _s3.project(camera);
+  if (_s3.z > 1) return null;
+  out.x = (_s3.x + 1) / 2 * _sw; out.y = (1 - _s3.y) / 2 * _sh;
+  return cam;
+}
+
+// 画面の (px,py) に いちばん近い スナップ先を返す
+function findSnap(px, py) {
+  if (!snapOn || !SNAP) return null;
+  const rr = renderer.domElement.getBoundingClientRect();
+  _sw = rr.width; _sh = rr.height;
+  const vis = SNAP.names.map(n => { const o = meshes[n]; return !!(o && o.visible); });
+  const q = new THREE.Vector2();
+  const R2 = SNAP_PX * SNAP_PX;
+  let best = null;
+  const P = SNAP.p;
+  for (let i = 0, j = 0; j < P.length; i++, j += 3) {
+    if (!vis[SNAP.li[i]]) continue;
+    _s1.set(P[j], P[j + 1], P[j + 2]);
+    const cam = toScreen(_s1, q);
+    if (cam === null) continue;
+    const dd = (q.x - px) * (q.x - px) + (q.y - py) * (q.y - py);
+    if (dd > R2) continue;
+    // ★ほぼ同じ所に重なっているときは 手前の点を選ぶ
+    if (!best || dd < best.dd - 36 || (dd < best.dd + 36 && cam < best.cam)) {
+      best = { dd, cam, i, name: SNAP.names[SNAP.li[i]], end: SNAP.end[i] };
+    }
+  }
+  if (best) {
+    const j = best.i * 3;
+    return { m: { e: P[j], n: P[j + 1], z: P[j + 2] },
+             kind: best.end ? '端点' : '節点', name: best.name };
+  }
+  // ★節点が無ければ 線の上（垂線の足）に吸い付く
+  const R2L = SNAP_LPX * SNAP_LPX;
+  const a = new THREE.Vector2(), b = new THREE.Vector2();
+  let bl = null;
+  M.lines.forEach((l, k) => {
+    const o = meshes[l.name]; if (!o || !o.visible) return;
+    for (const poly of l.p) {
+      for (let i = 0; i < poly.length - 1; i++) {
+        _s1.fromArray(poly[i]); if (toScreen(_s1, a) === null) continue;
+        _s2.fromArray(poly[i + 1]); const c2 = toScreen(_s2, b); if (c2 === null) continue;
+        const vx = b.x - a.x, vy = b.y - a.y;
+        const L2 = vx * vx + vy * vy; if (L2 < 1e-9) continue;
+        let t = ((px - a.x) * vx + (py - a.y) * vy) / L2;
+        t = Math.max(0, Math.min(1, t));
+        const qx = a.x + vx * t, qy = a.y + vy * t;
+        const dd = (qx - px) * (qx - px) + (qy - py) * (qy - py);
+        if (dd > R2L) continue;
+        if (!bl || dd < bl.dd) {
+          bl = { dd, name: l.name,
+                 m: { e: poly[i][0] + (poly[i + 1][0] - poly[i][0]) * t,
+                      n: poly[i][1] + (poly[i + 1][1] - poly[i][1]) * t,
+                      z: poly[i][2] + (poly[i + 1][2] - poly[i][2]) * t } };
+        }
+      }
+    }
+  });
+  return bl ? { m: bl.m, kind: '線上', name: bl.name } : null;
+}
+
 // ★S61 ズームの狙いを決める
 const _pt = new THREE.Vector2();
 const _vd = new THREE.Vector3();
@@ -437,9 +545,10 @@ function aimZoom(clientX, clientY) {
 //   張ブロックの厚みが 0.12 m なので 寄るほど 球で狙った点が隠れる。
 //   ★画面上の大きさを一定（半径 MARK_PX ピクセル）にして、寄っても大きくならないようにした。
 const MARK_PX = 4.5;            // 画面上の半径（ピクセル）。直径 9 px くらいの点
-function mark(m) {
+function mark(m, snapped) {
+  // ★S63 スナップしたときは 水色の点にして 吸い付いたことが分かるようにする
   const s = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8),
-    new THREE.MeshBasicMaterial({ color: 0xd23b2f, depthTest: false }));
+    new THREE.MeshBasicMaterial({ color: snapped ? 0x0aa3c2 : 0xd23b2f, depthTest: false }));
   s.position.set(m.e, m.n, m.z); s.renderOrder = 9; markGrp.add(s);
   sizeMarks();
 }

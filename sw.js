@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v23';  // ★S62 階段を横切っていた縦帯を取り消した（モデル更新）
+const V = 'sd-viewer-v24';  // ★S63 計測に スナップ（特徴線の節点・線上）を入れた
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
