@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 21;                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
+const APP_V = 22;                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
 let home = null;                   // ★S58 起動時のカメラ（「全体」で戻る先）
 let measureMode = false; const picks = [];
 const planes = [new THREE.Plane(), new THREE.Plane()];
@@ -106,13 +106,34 @@ async function init() {
   //   このモデルは 195 m の細長い堤防なので、target が真ん中に居るかぎり
   //   端を見ているときに寄っても 真ん中に引き戻される ＝ 効いていないように見える。
   //   ★zoomToCursor で 指（マウス）の位置に向かって寄るようにする。
-  controls.zoomToCursor = true;
+  controls.zoomToCursor = true;      // ★S61 指の下にモデルがあるときだけ true にする（aimZoom）
   controls.zoomSpeed = 1.6;          // ホイール・ピンチとも 既定 1.0 より速く
   controls.minDistance = 0.5;        // 寄りすぎて面に埋まるのを止める
   controls.maxDistance = Math.max(600, sz.length() * 4);   // 引きすぎて見失うのを止める
   camera.position.set(c.x + sz.x * 0.35, c.y + sz.length() * 0.28, c.z + sz.length() * 0.45);
   camera.lookAt(c); controls.update();
   home = { pos: camera.position.clone(), target: controls.target.clone() };   // ★S58
+
+  // ★S61 ズームが効かない件（その2）
+  //   zoomToCursor は 指の方へ寄るので 狙った所に近づけて具合がよい。
+  //   ところが この堤防は 195 m の細い帯なので、★指が空を指していることが多い。
+  //   そのとき 何もない方へ寄っていき、モデルは横へ逃げる ＝「ズームが効かない」。
+  //   → ★指の下にモデルがあるかを その場で調べて、無ければ 指ではなく
+  //     画面まんなかのモデルに向かって寄るように切り替える。
+  //   OrbitControls より先に判定したいので ★capture 付きで登録する。
+  const dom = renderer.domElement;
+  dom.addEventListener('wheel', e => aimZoom(e.clientX, e.clientY), { capture: true, passive: true });
+  const act = new Map();
+  dom.addEventListener('pointerdown', e => {
+    act.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (act.size === 2) {
+      const [a, b] = [...act.values()];
+      aimZoom((a.x + b.x) / 2, (a.y + b.y) / 2);     // 2本指の中点で判定
+    }
+  }, { capture: true });
+  const drop = e => act.delete(e.pointerId);
+  dom.addEventListener('pointerup', drop, { capture: true });
+  dom.addEventListener('pointercancel', drop, { capture: true });
 
   bindUI(); buildAnchors(); initFit();
   $('sub').textContent = `三角形 ${M.parts.reduce((a, p) => a + p.f.length, 0).toLocaleString()}／`
@@ -386,6 +407,31 @@ function onUp(e) {
   picks.length = 0;
   setTimeout(clearMarks, 6000);
 }
+// ★S61 ズームの狙いを決める
+const _pt = new THREE.Vector2();
+const _vd = new THREE.Vector3();
+function pickAt(nx, ny) {
+  _pt.set(nx, ny);
+  raycaster.setFromCamera(_pt, camera);
+  const tg = Object.values(meshes).filter(o => o.visible && o.isMesh);
+  return raycaster.intersectObjects(tg, false)[0] || null;
+}
+function aimZoom(clientX, clientY) {
+  if (!controls || !controls.enabled) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  const nx = ((clientX - r.left) / r.width) * 2 - 1;
+  const ny = -((clientY - r.top) / r.height) * 2 + 1;
+  if (pickAt(nx, ny)) { controls.zoomToCursor = true; return; }   // 指の下にモデルあり
+  // ★指が空を指している → 指には寄らない。注視点を 画面まんなかの奥行きに置き直す
+  //   （カメラの向きは変えないので 画面は跳ねない）
+  controls.zoomToCursor = false;
+  const c = pickAt(0, 0);
+  if (c) { controls.target.copy(c.point); return; }
+  camera.getWorldDirection(_vd);
+  const d = home ? camera.position.distanceTo(home.target) : controls.target.distanceTo(camera.position);
+  controls.target.copy(camera.position).addScaledVector(_vd, d);
+}
+
 // ★S59 計測のクリック点
 //   これまでは 半径 0.35 m（直径 0.70 m）の球を そのまま置いていた。
 //   張ブロックの厚みが 0.12 m なので 寄るほど 球で狙った点が隠れる。

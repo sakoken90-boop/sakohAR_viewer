@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v21';  // ★S60 コード（HTML/JS）を ネット優先にした。更新が端末に届かない件の対策
+const V = 'sd-viewer-v22';  // ★S61 指が空を指しているときも ズームが効くようにした
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
