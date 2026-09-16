@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 24;                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
+const APP_V = 25;                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
 let home = null;                   // ★S58 起動時のカメラ（「全体」で戻る先）
 let measureMode = false; const picks = [];
 const planes = [new THREE.Plane(), new THREE.Plane()];
@@ -107,6 +107,7 @@ async function init() {
   //   端を見ているときに寄っても 真ん中に引き戻される ＝ 効いていないように見える。
   //   ★zoomToCursor で 指（マウス）の位置に向かって寄るようにする。
   controls.zoomToCursor = true;      // ★S61 指の下にモデルがあるときだけ true にする（aimZoom）
+  controls.rotateSpeed = ROT_FAR;    // ★S64 距離に応じて 毎フレーム 付け替える（rotSpeed）
   controls.zoomSpeed = 1.6;          // ホイール・ピンチとも 既定 1.0 より速く
   controls.minDistance = 0.5;        // 寄りすぎて面に埋まるのを止める
   controls.maxDistance = Math.max(600, sz.length() * 4);   // 引きすぎて見失うのを止める
@@ -158,7 +159,7 @@ function onResize() {
 function tick(time, frame) {
   if (frame) arFrame(frame);
   if (fitOn) fitTick();
-  else if (!renderer.xr.isPresenting) controls && controls.update();
+  else if (!renderer.xr.isPresenting) { rotSpeed(); controls && controls.update(); }   // ★S64
   sizeMarks();                       // ★S59 計測点を いつも同じ大きさに見せる
   renderer.render(scene, camera);
 }
@@ -513,6 +514,21 @@ function findSnap(px, py) {
     }
   });
   return bl ? { m: bl.m, kind: '線上', name: bl.name } : null;
+}
+
+// ★S64 回転が速すぎる件（とくに寄っているとき）
+//   OrbitControls の回転は「画面の高さいっぱいのドラッグ ＝ 約180°」で、
+//   ★カメラが近いか遠いかに関係なく 同じ角度だけ回る。
+//   寄っているときは 画面に写る範囲が狭いので、同じ角度でも 振れ幅が大きく感じる。
+//   → ★注視点までの距離で 回転の速さを変える。
+//   速さを変えたいときは 下の3つの数字だけ直せばよい。
+const ROT_FAR  = 0.60;   // 引いているとき（既定の 1.0 より遅い）
+const ROT_NEAR = 0.15;   // 寄っているとき（引いているときの 1/4）
+const ROT_D    = 60;     // この距離（m）以上は ROT_FAR のまま
+function rotSpeed() {
+  if (!controls) return;
+  const d = camera.position.distanceTo(controls.target);
+  controls.rotateSpeed = ROT_NEAR + (ROT_FAR - ROT_NEAR) * Math.min(1, d / ROT_D);
 }
 
 // ★S61 ズームの狙いを決める
