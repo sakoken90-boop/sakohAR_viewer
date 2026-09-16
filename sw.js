@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v25';  // ★S64 回転の速さを 注視点までの距離で変えるようにした
+const V = 'sd-viewer-v26';  // ★S65 階段の幅を 2.000 m 一定にした（モデル更新）
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
