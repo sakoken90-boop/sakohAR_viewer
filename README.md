@@ -86,6 +86,7 @@ QR コードは、上の URL を QR 作成サービスに入れて作ってく�
          S66  ★iOS で Variant Launch 経由の 鋲基準 AR を選べるようにした（実験）
          S67  ★SDK キーを組み込み。iOS では設定なしで使える
          S68  ★AR の説明文を「Quick Look／Variant 経由／Android」で出し分けた
+         S69  ★Variant Launch が必ず空振りしていたのを直した（待ち方の間違い）
 ```
 
 ### ★見たい所へ寄る（S57／S58）
@@ -140,6 +141,25 @@ QR コードは、上の URL を QR 作成サービスに入れて作ってく�
     以外では使えないので、リポジトリに入っていて差し支えない
   ★無料枠では Launch Card に Variant のブランドが出る（消すには Pro）
   ★外部サービス頼みなので 本線は Android。iOS は補助と考える
+```
+
+#### ★S69　「Variant Launch を開始できませんでした」が出ていた件
+
+```
+  ★こちらの待ち方の間違い。ドメインの登録とは 関係なかった。
+    launchar.app の SDK は ★読み込み終わった時点では まだ VLaunch を作らない。
+    中で 非同期に初期化して、終わってから window に
+      ★vlaunch-initialized  を投げてくる（detail に webXRStatus など）
+    S67 は 読み込み終わり（onload）で VLaunch を見ていたので ★必ず空振り。
+    8 秒の保険も 先に「駄目」で片が付いた後なので 効いていなかった。
+  → ★vlaunch-initialized を待つようにした。
+  → 駄目だったときは ★何が駄目だったかを 画面に出す
+      「SDK を読み込めませんでした」        通信／キー
+      「SDK が初期化されませんでした」      ★ドメイン登録（8 秒待って出る）
+  → webXRStatus が unsupported の端末は ★黙って Quick Look に回す（断らない）
+  ★それでも駄目なとき  launchar.app の管理画面で ドメインが
+      sakoken90-boop.github.io
+    の形で 登録されているか（★省略なしの全部）。先方の決まりで 完全一致が要る
 ```
 
 ### ★回転の速さ（S64）
