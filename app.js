@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 40;
+const APP_V = 41;
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -835,19 +835,52 @@ function arPoint() {
   return v[0] === 'a' ? anchorZ()[+v.slice(1)] : M.stakes[+v.slice(1)];
 }
 
+// ★S82 いま選んでいる 基準の杭（AR1 など）。無ければ null
+function curAnchorName() {
+  try {
+    const v = $('anchor').value;
+    if (v && v[0] === 'a') return ((M.anchors || [])[+v.slice(1)] || {}).name || null;
+  } catch (e) {}
+  return null;
+}
+// ★S82 2つの選択欄（AR 前の画面と AR 中の UI）を そろえて 覚えておく
+const ANC = 'sd_anchor';
+function setAnchor(v) {
+  for (const id of ['anchor', 'anchor2']) {
+    const el = $(id); if (!el) continue;
+    if ([].some.call(el.options, o => o.value === v)) el.value = v;
+  }
+  try { localStorage.setItem(ANC, v); } catch (e) {}
+  try { if (anchorGrp) redrawAnchors(); } catch (e) {}     // ★選んだ杭を 緑にする
+  if (anchorW) arApply();
+}
+
 function initAR() {
-  const sel = $('anchor');
-  (M.anchors || []).forEach((a, i) => {          // ★鋲を先に並べる
-    const o = document.createElement('option');
-    o.value = 'a' + i; o.textContent = `★${a.name}（鋲・設計 ${a.ds.toFixed(0)}／離れ ${a.off}）`;
-    sel.appendChild(o);
-  });
-  M.stakes.forEach((k, i) => {
-    const o = document.createElement('option');
-    o.value = 's' + i; o.textContent = `${k.sv_no.replace('+00.000', '')}（設計 ${k.ds.toFixed(2)}）`;
-    sel.appendChild(o);
-  });
-  sel.selectedIndex = Math.min(3, M.stakes.length - 1);
+  const fill = (el) => {
+    if (!el) return;
+    (M.anchors || []).forEach((a, i) => {        // ★鋲を先に並べる
+      const o = document.createElement('option');
+      o.value = 'a' + i; o.textContent = `★${a.name}（鋲・設計 ${a.ds.toFixed(0)}／離れ ${a.off}）`;
+      el.appendChild(o);
+    });
+    M.stakes.forEach((k, i) => {
+      const o = document.createElement('option');
+      o.value = 's' + i; o.textContent = `${k.sv_no.replace('+00.000', '')}（設計 ${k.ds.toFixed(2)}）`;
+      el.appendChild(o);
+    });
+  };
+  fill($('anchor')); fill($('anchor2'));         // ★S82 AR 前の画面にも 同じものを出す
+  // ★S82 ここが ★ずっと間違っていた。
+  //   もとは selectedIndex = min(3, …) で「測点の4番目」を既定にするつもりだったが、
+  //   S26 で ★鋲を先に並べた ので、★AR4 が既定 になっていた。
+  //   現場は AR1 のつもりで 使っていた → ★117 m ずれる。
+  //   → ★既定は AR1。前に選んだものが あれば それを 覚えておく
+  let v0 = 'a0';
+  try { const sv = localStorage.getItem(ANC); if (sv) v0 = sv; } catch (e) {}
+  setAnchor(v0);
+  const onSel = (e) => setAnchor(e.target.value);
+  $('anchor').onchange = onSel;
+  if ($('anchor2')) $('anchor2').onchange = onSel;
 
   const ring = new THREE.RingGeometry(0.10, 0.14, 32).rotateX(-Math.PI / 2);
   reticle = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: 0x2f6f4e }));
@@ -936,7 +969,6 @@ function initAR() {
     try { await startAR(); }
     catch (e) { hud(''); }
   };
-  $('anchor').onchange = () => { if (anchorW) arApply(); };
   const bEnd = $('bAREnd');                      // ★S78 AR用UO の中の 終了ボタン
   if (bEnd) bEnd.onclick = () => { if (xrSession) xrSession.end(); };
   $('arRot').oninput = () => { heading = headingBase + THREE.MathUtils.degToRad(+$('arRot').value); $('arRotV').textContent = (+$('arRot').value).toFixed(1) + '°'; arApply(); };
@@ -1238,9 +1270,16 @@ function redrawAnchors() {
   while (anchorGrp.children.length) anchorGrp.remove(anchorGrp.children[0]);
   for (const a of anchorZ()) {
     if (fitSkip && a.name === fitSkip) continue;   // ★カメラがこの中に入るので隠す
-    const h = 2.0;
-    const g = new THREE.CylinderGeometry(0.035, 0.035, h, 8).rotateX(Math.PI / 2).translate(a.x, a.y, a.z + h / 2);
-    anchorGrp.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xd23b2f })));
+    // ★S82 いま選んでいる杭だけ ★緑で 太く（どれで合わせるのか 一目で分かるように）
+    const on = (a.name === curAnchorName());
+    const h = on ? 2.6 : 2.0, rr = on ? 0.06 : 0.035;
+    const g = new THREE.CylinderGeometry(rr, rr, h, 8).rotateX(Math.PI / 2).translate(a.x, a.y, a.z + h / 2);
+    anchorGrp.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: on ? 0x16a34a : 0xd23b2f })));
+    if (on) {                                   // ★足元に 緑の輪
+      const rg = new THREE.RingGeometry(0.30, 0.42, 36).translate(a.x, a.y, a.z + 0.01);
+      anchorGrp.add(new THREE.Mesh(rg, new THREE.MeshBasicMaterial({
+        color: 0x16a34a, side: THREE.DoubleSide })));
+    }
     // ★S37 合わせ十字（地面に置く十字の的）。USDZ に入れているものと同じ形
     const L = (a.name === 'AR1' ? 3.0 : 2.0), tn = nearestAxis(a.ds)[3];
     const mt = new THREE.MeshBasicMaterial({ color: 0xe61ea0 });

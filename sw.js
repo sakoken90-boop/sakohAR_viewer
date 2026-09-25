@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v40';  // ★S80 three に参照空間の型を伝える＋重ね表示を既定オフ
+const V = 'sd-viewer-v41';  // ★S82 基準の杭を AR 前に選べる＋既定を AR1 に直した
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
