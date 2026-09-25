@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 35;
+const APP_V = 36;
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -911,10 +911,10 @@ function initAR() {
       alert('この端末では現地 AR（immersive-ar）が使えません。\nAndroid では「Google Play開発者サービス（AR）」の更新で使えるようになることがあります。'); return;
     }
     hud('AR を開始しています…');
-    $('bAR').textContent = '開始中…';
-    try { await withTimeout(startAR(), 25000, 'AR の開始'); }
-    catch (e) { hud(''); $('bAR').textContent = quickLook ? 'AR（実寸）' : 'AR';
-      alert('AR を開始できません。\n' + ((e && e.message) || e)); }
+    // ★S76 startAR の中で 段階ごとに 時間を切ってあり、
+    //   しくじったら ★記録をまとめて出す ので、ここで重ねて出さない
+    try { await startAR(); }
+    catch (e) { hud(''); }
   };
   $('anchor').onchange = () => { if (anchorW) arApply(); };
   $('arRot').oninput = () => { heading = headingBase + THREE.MathUtils.degToRad(+$('arRot').value); $('arRotV').textContent = (+$('arRot').value).toFixed(1) + '°'; arApply(); };
@@ -969,64 +969,98 @@ function arApply() {
   arRoot.position.y += zOff;
 }
 
+// ★S76 AR 中の見た目を まとめて切り替える。
+//   ★これを セッションを始める ★前 に呼ぶのが 肝。
+//   Variant の dom-overlay は「root 以外の要素を隠す」まね事で作られていて、
+//   ★セッションに入った後の DOM の書き換えが 画面に出ないことがある。
+//   実際 S75 で入れた「①カメラの起動…」の表示も ★一度も出なかった。
+//   → ★入る前に AR の見た目にしてしまう。しくじったら 戻す。
+function arSkin(on) {
+  try {
+    document.documentElement.classList.toggle('arx', on);
+    document.body.classList.toggle('arx', on);
+    try { renderer.setClearAlpha(on ? 0 : 1); } catch (e) {}
+    scene.background = on ? null : new THREE.Color(0xf4f5f3);
+    controls.enabled = !on; zoomUI(!on);
+    if (on) { $('sheet').classList.remove('open'); $('bPanel').classList.remove('on'); }
+    $('arui').classList.toggle('show', on);
+    // ★AR 中は 書き換えが 画面に出ないことがあるので 案内も ★先に入れておく
+    if (on) $('arTip').textContent = '床を映して輪郭が出たら「① 足元に合わせる」を押してください。';
+    $('bAR').textContent = on ? 'AR終了' : (isQuickLook() ? 'AR（実寸）' : 'AR');
+    $('bAR').classList.toggle('on', on);
+    stakeGrp.visible = on ? false : $('cStakes').checked;
+    hud('');
+  } catch (e) {}
+}
+// ★S76 AR 中は 画面に出せないので 段階を ためておき、終わってから 見せる
+let arLog = [];
+function arLogShow(head) {
+  const t = arLog.join('\n');
+  arLog = [];
+  if (t) alert(head + '\n\n' + t);
+}
+
 async function startAR() {
   // ★S66 Variant のビューアの中では dom-overlay を ★必須にする
-  //   任意のままだと 画面の UI（高さスライダーなど）が出ないことがある
-  const vlx = (() => { try {
-    return new URLSearchParams(location.search).get('vlxr') === '1';
-  } catch (e) { return false; } })();
-  // ★S75 どこまで進んだかを 画面に残す（止まった所が 分かるように）
-  const step = (s) => hud('AR を開始しています…　' + s);
-  step('①カメラの起動');
-  const session = await withTimeout(navigator.xr.requestSession('immersive-ar', {
-    requiredFeatures: vlx ? ['hit-test', 'dom-overlay'] : ['hit-test'],
-    optionalFeatures: vlx ? [] : ['dom-overlay'],
-    domOverlay: { root: document.body },
-  }), 20000, '①カメラの起動');
-  xrSession = session;
-  step('②描画の引き渡し');
-  await withTimeout(renderer.xr.setSession(session), 10000, '②描画の引き渡し');
-  step('③基準の空間');
-  // ★S75 local が無い作りもあるので 順に試す
-  refSpace = null;
-  for (const t of ['local', 'local-floor', 'viewer']) {
-    try { refSpace = await withTimeout(session.requestReferenceSpace(t), 8000, '③基準の空間（' + t + '）'); break; }
-    catch (e) { /* 次を試す */ }
-  }
-  if (!refSpace) throw new Error('★基準の空間（local）が取れませんでした。');
-  step('④床の検出');
-  // ★S75 床の検出が使えなくても AR そのものには入れるようにする
+  const vlx = isVlx();
+  arLog = [];
+  const step = (s) => {
+    arLog.push(new Date().toLocaleTimeString() + '　' + s);
+    hud('AR を開始しています…　' + s);          // ★出れば出るで よい
+  };
+
+  step('⓪画面を AR 用にする');
+  arSkin(true);
+  // ★描き直しを 2 コマ待ってから 入る（切り替えを 確実に 間に合わせる）
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
   try {
-    const viewer = await withTimeout(session.requestReferenceSpace('viewer'), 8000, '④基準（viewer）');
-    hitSource = await withTimeout(session.requestHitTestSource({ space: viewer }), 10000, '④床の検出');
-  } catch (e) { hitSource = null; }
+    step('①カメラの起動');
+    const session = await withTimeout(navigator.xr.requestSession('immersive-ar', {
+      requiredFeatures: vlx ? ['hit-test', 'dom-overlay'] : ['hit-test'],
+      optionalFeatures: vlx ? [] : ['dom-overlay'],
+      domOverlay: { root: document.body },
+    }), 20000, '①カメラの起動');
+    xrSession = session;
 
-  // ★S75 iOS では カメラ映像が ブラウザの背後。ページを 透かさないと 真っ白のまま
-  document.documentElement.classList.add('arx');
-  document.body.classList.add('arx');
-  try { renderer.setClearAlpha(0); } catch (e) {}
-  scene.background = null; controls.enabled = false; zoomUI(false);   // ★S58
-  $('sheet').classList.remove('open'); $('bPanel').classList.remove('on');
-  hud('');                                                   // ★S74 案内を消す
-  $('arui').classList.add('show'); $('bAR').textContent = 'AR終了'; $('bAR').classList.add('on');
-  stakeGrp.visible = false;
-  $('arTip').textContent = hitSource
-    ? '床を映して輪郭が出たら「① 足元に合わせる」を押してください。'
-    : '★床の検出が使えませんでした。画面の中央が 足元に来るように構えて「① 足元に合わせる」を押してください。';
+    step('②描画の引き渡し');
+    await withTimeout(renderer.xr.setSession(session), 10000, '②描画の引き渡し');
 
-  session.addEventListener('end', () => {
-    document.documentElement.classList.remove('arx');   // ★S75 下地を戻す
-    document.body.classList.remove('arx');
-    try { renderer.setClearAlpha(1); } catch (e) {}
-    xrSession = null; hitSource = null; reticle.visible = false;
-    scene.background = new THREE.Color(0xf4f5f3); controls.enabled = true; zoomUI(true);   // ★S58
-    arRoot.position.set(0, 0, 0); arRoot.quaternion.identity();
-    anchorW = null; heading = 0; headingBase = 0; zOff = 0;
-    $('arui').classList.remove('show'); $('bAR').classList.remove('on');
-    $('bAR').textContent = isQuickLook() ? 'AR（実寸）' : 'AR';   // ★S74 iOS では 実寸と出す
-    stakeGrp.visible = $('cStakes').checked;
-    $('arRot').value = 0; $('arZ').value = 0;
-  });
+    step('③基準の空間');
+    refSpace = null;
+    for (const t of ['local', 'local-floor', 'viewer']) {
+      try { refSpace = await withTimeout(session.requestReferenceSpace(t), 8000, '③基準の空間（' + t + '）'); step('　→ ' + t + ' が取れた'); break; }
+      catch (e) { step('　→ ' + t + ' は駄目'); }
+    }
+    if (!refSpace) throw new Error('★基準の空間が どれも取れませんでした。');
+
+    step('④床の検出');
+    try {
+      const viewer = await withTimeout(session.requestReferenceSpace('viewer'), 8000, '④基準（viewer）');
+      hitSource = await withTimeout(session.requestHitTestSource({ space: viewer }), 10000, '④床の検出');
+      step('　→ 床の検出 ★使える');
+    } catch (e) { hitSource = null; step('　→ 床の検出 は使えない（' + ((e && e.message) || e) + '）'); }
+
+    step('⑤できあがり');
+    $('arTip').textContent = hitSource
+      ? '床を映して輪郭が出たら「① 足元に合わせる」を押してください。'
+      : '★床の検出が使えませんでした。画面の中央が 足元に来るように構えて「① 足元に合わせる」を押してください。';
+
+    session.addEventListener('end', () => {
+      arSkin(false);                                  // ★S76 見た目を 戻す
+      xrSession = null; hitSource = null; reticle.visible = false;
+      arRoot.position.set(0, 0, 0); arRoot.quaternion.identity();
+      anchorW = null; heading = 0; headingBase = 0; zOff = 0;
+      $('arRot').value = 0; $('arZ').value = 0;
+      // ★AR 中は 画面に出せなかったので ここで まとめて見せる
+      arLogShow('★AR の記録（うまく行った分も含みます）');
+    });
+  } catch (e) {
+    arSkin(false);                                    // ★しくじったら 戻す
+    step('★止まった：' + ((e && e.message) || e));
+    arLogShow('★AR を開始できませんでした。どこまで進んだか：');
+    throw e;
+  }
 }
 
 function arFrame(frame) {

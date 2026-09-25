@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v35';  // ★S75 AR 中は下地を透かす（iOS はカメラが背後）＋進み具合を出す
+const V = 'sd-viewer-v36';  // ★S76 AR の見た目を 入る前に切り替える＋記録を後で見せる
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

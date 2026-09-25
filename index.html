@@ -13,7 +13,11 @@
   --sheet: min(360px, 92vw);
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+/* ★S76 下地は ★常に透明。ふだんの背景色は 3D 側（scene.background）が描いている。
+   iOS ではカメラが ブラウザの背後にあるので、下地が不透明だと AR で真っ白になる。
+   ★AR 中の書き換えは 画面に出ないことがあるため、はじめから透明にしておく。
+   読み込み中は #msg が 全面を覆うので ちらつかない。 */
+html,body{margin:0;height:100%;overflow:hidden;background:transparent;color:var(--ink);
   font:14px/1.5 system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif}
 /* ★S75 iOS（Variant のビューア）では カメラ映像が ★ブラウザの背後 に描かれる。
    ページが不透明だと そこで隠れてしまう（＝真っ白のまま）。
