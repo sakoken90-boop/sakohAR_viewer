@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v36';  // ★S76 AR の見た目を 入る前に切り替える＋記録を後で見せる
+const V = 'sd-viewer-v37';  // ★S77 AR に入ったら まず目の前に仮置き＋床が無くても合わせられる
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

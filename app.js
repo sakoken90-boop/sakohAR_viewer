@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 36;
+const APP_V = 37;
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -314,6 +314,20 @@ async function init() {
   const drop = e => act.delete(e.pointerId);
   dom.addEventListener('pointerup', drop, { capture: true });
   dom.addEventListener('pointercancel', drop, { capture: true });
+
+  // ★S77 逃げ道　AR 中は ★画面を触っても 合わせられるようにする。
+  //   Variant のビューアでは 下のボタンが 見えないことがあるため。
+  //   ★1回たたく → ①足元に合わせる ／ ★2回たたく → ②向きを合わせる
+  let arTapT = 0;
+  dom.addEventListener('pointerdown', () => {
+    if (!xrSession) return;
+    const now = Date.now();
+    if (now - arTapT < 450) { arTapT = 0; $('bHeading').click(); return; }
+    arTapT = now;
+    setTimeout(() => {
+      if (arTapT && Date.now() - arTapT >= 450) { arTapT = 0; $('bPlace').click(); }
+    }, 470);
+  });
 
   bindUI(); buildAnchors(); initFit();
   $('sub').textContent = `三角形 ${M.parts.reduce((a, p) => a + p.f.length, 0).toLocaleString()}／`
@@ -920,27 +934,24 @@ function initAR() {
   $('arRot').oninput = () => { heading = headingBase + THREE.MathUtils.degToRad(+$('arRot').value); $('arRotV').textContent = (+$('arRot').value).toFixed(1) + '°'; arApply(); };
   $('arZ').oninput = () => { zOff = +$('arZ').value / 100; $('arZV').textContent = zOff.toFixed(2); arApply(); };
   $('bPlace').onclick = () => {
-    if (!reticle.visible) {
-      // ★S75 床の検出そのものが使えないときだけ、カメラの 1.5 m 前・1.2 m 下 を仮に使う
-      if (!hitSource) {
-        const p = new THREE.Vector3(), d = new THREE.Vector3();
-        camera.getWorldPosition(p); camera.getWorldDirection(d);
-        d.y = 0; if (d.lengthSq() < 1e-6) d.set(0, 0, -1); d.normalize();
-        anchorW = p.clone().addScaledVector(d, 1.5); anchorW.y = p.y - 1.2;
-        arApply();
-        $('arTip').textContent = '★床が使えないので 仮に置きました（精度は落ちます）。次に「② 向きを合わせる」を押してください。';
-        return;
-      }
-      $('arTip').textContent = '床が認識できていません。少しゆっくり動かして輪郭を出してください。'; return;
-    }
-    anchorW = new THREE.Vector3().setFromMatrixPosition(reticle.matrix);
-    arApply();
-    $('arTip').textContent = '置きました。次に、堤防の上流側の地面（できれば別の鋲）に向けて「② 向きを合わせる」を押してください。';
+    // ★S77 床の輪郭が出ていれば そこ。出ていなければ ★端末の前 1.5 m・1.2 m 下
+    //   （床の検出が効かない場面でも ★必ず 先に進めるようにする）
+    let t = null;
+    if (reticle.visible) t = new THREE.Vector3().setFromMatrixPosition(reticle.matrix);
+    else t = provPoint(1.5);
+    if (!t) { $('arTip').textContent = 'まだ場所が定まりません。少し動かしてから もう一度 押してください。'; return; }
+    anchorW = t; arProv = false; arApply();
+    $('arTip').textContent = reticle.visible
+      ? '置きました。次に、堤防の上流側の地面（できれば別の鋲）に向けて「② 向きを合わせる」を押してください。'
+      : '★床が使えないので 足元を 目分量で置きました（精度は落ちます）。次に「② 向きを合わせる」を押してください。';
   };
   $('bHeading').onclick = () => {
     if (!anchorW) { $('arTip').textContent = '先に「① 足元に合わせる」を押してください。'; return; }
-    if (!reticle.visible) { $('arTip').textContent = '床が認識できていません。'; return; }
-    const tgt = new THREE.Vector3().setFromMatrixPosition(reticle.matrix);
+    // ★S77 床が無ければ ★いま向いている方向の 5 m 先 を狙った所とみなす
+    const tgt = reticle.visible
+      ? new THREE.Vector3().setFromMatrixPosition(reticle.matrix)
+      : provPoint(5);
+    if (!tgt) { $('arTip').textContent = 'まだ向きが定まりません。少し動かしてから もう一度 押してください。'; return; }
     const d = tgt.clone().sub(anchorW); d.y = 0;
     if (d.length() < 0.6) { $('arTip').textContent = 'もう少し離れた地面に向けてください（1 m 以上）。'; return; }
     const k = arPoint();
@@ -985,7 +996,8 @@ function arSkin(on) {
     if (on) { $('sheet').classList.remove('open'); $('bPanel').classList.remove('on'); }
     $('arui').classList.toggle('show', on);
     // ★AR 中は 書き換えが 画面に出ないことがあるので 案内も ★先に入れておく
-    if (on) $('arTip').textContent = '床を映して輪郭が出たら「① 足元に合わせる」を押してください。';
+    if (on) $('arTip').textContent = '★モデルは まず 目の前 3 m に 仮置きしています。'
+      + '基準の杭の所に立って、足元を映しながら「① 足元に合わせる」を押してください。';
     $('bAR').textContent = on ? 'AR終了' : (isQuickLook() ? 'AR（実寸）' : 'AR');
     $('bAR').classList.toggle('on', on);
     stakeGrp.visible = on ? false : $('cStakes').checked;
@@ -1049,6 +1061,7 @@ async function startAR() {
     session.addEventListener('end', () => {
       arSkin(false);                                  // ★S76 見た目を 戻す
       xrSession = null; hitSource = null; reticle.visible = false;
+      viewerPos = null; viewerFwd = null; arProv = false;   // ★S77
       arRoot.position.set(0, 0, 0); arRoot.quaternion.identity();
       anchorW = null; heading = 0; headingBase = 0; zOff = 0;
       $('arRot').value = 0; $('arZ').value = 0;
@@ -1063,8 +1076,35 @@ async function startAR() {
   }
 }
 
+// ★S77 端末（カメラ）の いまの位置と 向き。AR に入った直後の ★仮置き に使う
+let viewerPos = null, viewerFwd = null, arProv = false;
+// ★仮に置く場所　前方 d m ・ 1.2 m 下（＝だいたい 足元）
+function provPoint(d) {
+  if (!viewerPos || !viewerFwd) return null;
+  const p = viewerPos.clone().addScaledVector(viewerFwd, d);
+  p.y = viewerPos.y - 1.2;
+  return p;
+}
+
 function arFrame(frame) {
-  if (!hitSource || !refSpace) return;
+  if (!refSpace) return;
+  // ★S77 端末の位置・向きを 毎コマ 取っておく（床の検出が使えなくても これは取れる）
+  const vp = frame.getViewerPose(refSpace);
+  if (vp) {
+    const m = new THREE.Matrix4().fromArray(vp.transform.matrix);
+    viewerPos = (viewerPos || new THREE.Vector3()).setFromMatrixPosition(m);
+    const q = new THREE.Quaternion().setFromRotationMatrix(m);
+    const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
+    f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize();
+    viewerFwd = (viewerFwd || new THREE.Vector3()).copy(f);
+    // ★S77 まだ合わせていない間は 前方 3 m に ★仮置き して ★とにかく見えるようにする
+    //   （これが無いと AR に入った直後 モデルが どこにあるか 分からない）
+    if (!anchorW) {
+      const p = provPoint(3);
+      if (p) { anchorW = p; arProv = true; arApply(); }
+    }
+  }
+  if (!hitSource) { reticle.visible = false; return; }
   const hits = frame.getHitTestResults(hitSource);
   if (hits.length) {
     const pose = hits[0].getPose(refSpace);
