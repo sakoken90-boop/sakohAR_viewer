@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v30';  // ★S69 Variant Launch の待ち方を直した（vlaunch-initialized）
+const V = 'sd-viewer-v31';  // ★S71 飛び先を 3通り試すようにした
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

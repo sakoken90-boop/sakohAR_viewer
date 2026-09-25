@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 30;
+const APP_V = 31;
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -70,9 +70,11 @@ function vlLoad() {
     // ★本命　初期化の知らせを待つ
     window.addEventListener('vlaunch-initialized', (ev) => {
       vlState = (ev && ev.detail) || {};
-      fin(ready()
+      // ★S71 getLaunchUrl が生えていなくても、知らせの中に 飛び先があれば 進める
+      const usable = ready() || !!(vlState.launchUrl || vlState.directAppClipUrl);
+      fin(usable
         ? { ok: true, why: '', detail: vlState }
-        : { ok: false, why: '初期化はされましたが VLaunch が使えません。', detail: vlState });
+        : { ok: false, why: '初期化はされましたが 飛び先が ありませんでした。', detail: vlState });
     }, { once: true });
 
     const sc = document.createElement('script');
@@ -89,13 +91,53 @@ function vlLoad() {
       }, 100);
     };
     document.head.appendChild(sc);
-    // ★総あきらめ
+    // ★総あきらめ（下のコメントは 8 秒の意味）
     setTimeout(() => fin({ ok: false,
       why: 'SDK が初期化されませんでした。\n'
          + 'launchar.app の管理画面で ドメイン\n  sakoken90-boop.github.io\n'
          + 'が登録されているか 確かめてください（★省略なしの全部）。' }), 8000);
   });
-}               // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
+}
+
+// ★S71 App Clip への飛び先を作る。★道は3通りあるので 順に試す
+//   ① getLaunchUrl(いまのURL + ?vlxr=1)   ★開き直したら そのまま AR に入れる
+//   ② 知らせの中の launchUrl              いまのページを開き直すだけ（AR は手で押す）
+//   ③ directAppClipUrl                    App Clip へ直に（30 分で切れる）
+//   S71 まで ①しか見ていなかったので、①が止まると そこで終わっていた
+function vlUrl(detail) {
+  const out = { url: null, how: '', err: '' };
+  try {
+    if (window.VLaunch && window.VLaunch.getLaunchUrl) {
+      const u = new URL(location.href); u.searchParams.set('vlxr', '1');
+      const lu = VLaunch.getLaunchUrl(u.toString());
+      if (lu) { out.url = lu; out.how = '①'; return out; }
+    }
+  } catch (e) { out.err = String((e && e.message) || e); }
+  const d = detail || vlState || {};
+  if (d.launchUrl)        { out.url = d.launchUrl;        out.how = '②'; return out; }
+  if (d.directAppClipUrl) { out.url = d.directAppClipUrl; out.how = '③'; return out; }
+  return out;
+}
+// ★いまの状態を 短く言葉にする（困ったときに 画面から読めるように）
+function vlDesc(d) {
+  d = d || vlState || {};
+  const s = { 'supported': 'もう使える', 'launch-required': 'App Clip が要る',
+              'unsupported': 'この端末では無理' }[d.webXRStatus] || '不明';
+  return 'WebXR ' + s
+       + '／知らせ ' + (vlState ? 'あり' : 'なし')
+       + '／getLaunchUrl ' + (window.VLaunch && window.VLaunch.getLaunchUrl ? 'あり' : 'なし')
+       + '／launchUrl ' + (d.launchUrl ? 'あり' : 'なし');
+}
+// ★どの道で飛んだかを 残す（②③のときは 開き直した先で AR を手で押す必要がある）
+function vlNote(g, d) {
+  try {
+    const h = $('hud');
+    if (h) h.textContent = 'Variant Launch へ（' + g.how + '）'
+         + (g.how === '①' ? '' : '★開いた先で もう一度「AR（実寸）」を押してください')
+         + '　' + vlDesc(d);
+  } catch (e) {}
+}
+               // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
 let home = null;                   // ★S58 起動時のカメラ（「全体」で戻る先）
 let measureMode = false; const picks = [];
 const planes = [new THREE.Plane(), new THREE.Plane()];
@@ -760,16 +802,17 @@ function initAR() {
           if (d.webXRStatus === 'unsupported') {
             $('arq').click(); return;
           }
-          try {
-            const u = new URL(location.href); u.searchParams.set('vlxr', '1');
-            const lu = VLaunch.getLaunchUrl(u.toString());
-            if (lu) { location.href = lu; return; }
-            why = '飛び先（launchUrl）が作れませんでした。';
-          } catch (e) { why = '飛び先を作るときに止まりました：' + e; }
+          // ★S71 飛び先は 3通りある。1つ目で止まっても 次を試す
+          const g = vlUrl(d);
+          if (g.url) { vlNote(g, d); location.href = g.url; return; }
+          why = g.err
+            ? '飛び先を作るときに止まりました：' + g.err
+            : '飛び先（launchUrl）が どの道でも作れませんでした。';
         }
         alert('Variant Launch を開始できませんでした。\n'
             + (why ? '\n' + why + '\n' : '')
-            + '\nこのまま Quick Look で開きます。');
+            + '\n状態：' + vlDesc(d)
+            + '\n\nこのまま Quick Look で開きます。');
       }
       $('arq').click(); return;                       // iOS：Quick Look で 1:1 配置
     }
