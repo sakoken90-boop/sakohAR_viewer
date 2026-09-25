@@ -13,7 +13,89 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 22;                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
+const APP_V = 30;
+
+// ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
+//   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
+//   AR Quick Look（USDZ・下端が床基準）で開いている。
+//   Variant Launch は ★App Clip の中で 本物の WebXR を注入するしくみで、
+//   hit-test／dom-overlay／anchors とも対応している（Release 扱い）。
+//   → ★キーを入れて 目を入れたときだけ そちらへ回す。
+//     キーが無ければ 何も読み込まず、従来どおり Quick Look で開く。
+//     ★Android には いっさい影響しない。
+//   ★S67 SDK キーを埋め込んだ（launchar.app の Developer 枠）。
+//     このキーは ★ドメインに紐づく公開キー で、ブラウザに読ませる前提のもの。
+//     公開リポジトリに入るが、登録したドメイン以外では使えない。
+//     ★スクリプトの読み込みに redirect=true は付けない。
+//       付けると iOS の人が ページを開いた瞬間に Launch Card へ飛ばされてしまい、
+//       3D を見たいだけのときに 邪魔になる。★AR を押したときだけ飛ばす。
+const VL_KEY = 'FGPbJOgFWENTTF9nLyeQzsHPDZFUYmGo';
+const VKEY = 'sd_vlkey', VON = 'sd_vlon';
+const vlKey = () => { try { return localStorage.getItem(VKEY) || VL_KEY; } catch (e) { return VL_KEY; } };
+// ★キーが埋め込んであれば 既定で「入」。端末で切ることもできる
+const vlOn  = () => {
+  try { const v = localStorage.getItem(VON); if (v !== null) return v === '1'; } catch (e) {}
+  return !!VL_KEY;
+};
+// ★この端末は AR Quick Look 行きか（＝WebXR が無い iPhone / iPad か）
+//   initAR() と 設定パネルの両方から見るので 関数にしてある
+function isQuickLook() {
+  if (navigator.xr) return false;                 // WebXR があれば そちら
+  const a = document.createElement('a');
+  return !!(a.relList && a.relList.supports && a.relList.supports('ar'));
+}
+// SDK は ★使うときにだけ 読み込む（未設定なら 通信もしない）
+//
+// ★S69 ここに 間違いがあった。
+//   launchar.app/sdk/v1 は ★読み込み終わった時点（onload）では
+//   まだ window.VLaunch を作っていない。中で 非同期に初期化して、
+//   終わってから ★window に vlaunch-initialized を投げてくる。
+//   S67 は onload で window.VLaunch を見ていたので ★必ず空振りし、
+//   「Variant Launch を開始できませんでした」が 毎回 出ていた。
+//   （8 秒の保険も 先に res(false) で片が付いた後なので 効かない）
+//   → ★vlaunch-initialized を待つ。
+//   detail の中身  launchRequired / webXRStatus / launchUrl / directAppClipUrl
+//     webXRStatus  'supported'（もう WebXR が使える＝Variant の中）
+//                  'launch-required'（App Clip へ飛ばせば使える）
+//                  'unsupported'（この端末では無理）
+let vlState = null;                                  // 初期化イベントの中身
+function vlLoad() {
+  return new Promise((res) => {
+    if (window.VLaunch && window.VLaunch.getLaunchUrl) return res({ ok: true, why: '' });
+    const k = vlKey(); if (!k) return res({ ok: false, why: 'SDK キーが入っていません。' });
+    let done = false;
+    const fin = (r) => { if (!done) { done = true; res(r); } };
+    const ready = () => !!(window.VLaunch && window.VLaunch.getLaunchUrl);
+
+    // ★本命　初期化の知らせを待つ
+    window.addEventListener('vlaunch-initialized', (ev) => {
+      vlState = (ev && ev.detail) || {};
+      fin(ready()
+        ? { ok: true, why: '', detail: vlState }
+        : { ok: false, why: '初期化はされましたが VLaunch が使えません。', detail: vlState });
+    }, { once: true });
+
+    const sc = document.createElement('script');
+    sc.src = 'https://launchar.app/sdk/v1?key=' + encodeURIComponent(k);
+    // ★読み込めなかった：通信が切れている／キーが違う／ドメインが弾かれた
+    sc.onerror = () => fin({ ok: false,
+      why: 'SDK を読み込めませんでした。通信 または SDK キーを確かめてください。' });
+    // ★読み込めた：生えるまで 0.1 秒ごとに見る（知らせを取りこぼしたとき用）
+    sc.onload = () => {
+      let n = 0;
+      const t = setInterval(() => {
+        if (ready()) { clearInterval(t); fin({ ok: true, why: '' }); }
+        else if (++n > 80 || done) { clearInterval(t); }
+      }, 100);
+    };
+    document.head.appendChild(sc);
+    // ★総あきらめ
+    setTimeout(() => fin({ ok: false,
+      why: 'SDK が初期化されませんでした。\n'
+         + 'launchar.app の管理画面で ドメイン\n  sakoken90-boop.github.io\n'
+         + 'が登録されているか 確かめてください（★省略なしの全部）。' }), 8000);
+  });
+}               // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
 let home = null;                   // ★S58 起動時のカメラ（「全体」で戻る先）
 let measureMode = false; const picks = [];
 const planes = [new THREE.Plane(), new THREE.Plane()];
@@ -33,7 +115,7 @@ const OFF = new Set(['かごマット2段_横断図', 'かごマット3段_横�
   '線_大型張ブロック', '線_縦帯コンクリート', '線_基礎コンクリートブロック',
   '線_均しコンクリート', '線_根固めブロック', '線_かごマット2段_平面図',
   '線_かごマット3段_平面図', '線_かごマット2段_横断図', '線_かごマット3段_横断図',
-  '線_階段_本体', '線_階段_小口止工', '線_階段_縦帯工', '線_横帯工',
+  '線_階段_本体', '線_階段_小口止工', '線_横帯工',
   'AR基準点']);          // ★S30 モデル側のポールは USDZ／SketchUp 用。
                         //    ビューアは app.js が自前で描くので既定 OFF（二重＋視界を塞ぐ）
 
@@ -94,7 +176,7 @@ async function init() {
   zup = new THREE.Group(); zup.rotation.x = -Math.PI / 2; arRoot.add(zup);
   root = new THREE.Group(); zup.add(root);
 
-  buildParts(); buildAxis(); buildStakes();
+  buildParts(); buildAxis(); buildStakes(); buildSnap();   // ★S63
   markGrp = new THREE.Group(); root.add(markGrp);
 
   const box = new THREE.Box3().setFromObject(root);
@@ -107,6 +189,7 @@ async function init() {
   //   端を見ているときに寄っても 真ん中に引き戻される ＝ 効いていないように見える。
   //   ★zoomToCursor で 指（マウス）の位置に向かって寄るようにする。
   controls.zoomToCursor = true;      // ★S61 指の下にモデルがあるときだけ true にする（aimZoom）
+  controls.rotateSpeed = ROT_FAR;    // ★S64 距離に応じて 毎フレーム 付け替える（rotSpeed）
   controls.zoomSpeed = 1.6;          // ホイール・ピンチとも 既定 1.0 より速く
   controls.minDistance = 0.5;        // 寄りすぎて面に埋まるのを止める
   controls.maxDistance = Math.max(600, sz.length() * 4);   // 引きすぎて見失うのを止める
@@ -148,6 +231,13 @@ async function init() {
   });
   renderer.setAnimationLoop(tick);
   initAR();
+  // ★S66 Variant のビューアの中で開き直されたときは そのまま AR に入る
+  try {
+    if (new URLSearchParams(location.search).get('vlxr') === '1' && navigator.xr) {
+      hud('現地 AR を開きます…');
+      setTimeout(() => { const b = $('bAR'); if (b) b.click(); }, 900);
+    }
+  } catch (e) {}
 }
 
 function onResize() {
@@ -158,7 +248,7 @@ function onResize() {
 function tick(time, frame) {
   if (frame) arFrame(frame);
   if (fitOn) fitTick();
-  else if (!renderer.xr.isPresenting) controls && controls.update();
+  else if (!renderer.xr.isPresenting) { rotSpeed(); controls && controls.update(); }   // ★S64
   sizeMarks();                       // ★S59 計測点を いつも同じ大きさに見せる
   renderer.render(scene, camera);
 }
@@ -311,8 +401,41 @@ function bindUI() {
 
   $('bMeasure').onclick = () => {
     measureMode = !measureMode; $('bMeasure').classList.toggle('on', measureMode);
-    clearMarks(); hud(measureMode ? '計測モード：2点をタップしてください。' : '');
+    clearMarks();
+    hud(measureMode ? ('計測モード：2点をタップしてください。'
+        + (snapOn ? '<br><span class="k">★特徴線の節点（法肩・天端・法尻・ブロックの角など）に吸い付きます。'
+                    + '外すときは 表示 →「計測」→ スナップ の目を外す</span>' : '')) : '');
   };
+  // ★S66 Variant Launch（iOS の鋲基準 AR）の設定
+  if ($('cVL')) {
+    $('cVL').checked = vlOn();
+    $('vlKey').value = vlKey();
+    const vlNote = () => {
+      if (!isQuickLook()) {                          // Android など では触れない
+        $('cVL').disabled = true; $('vlKey').disabled = true; $('vlSave').disabled = true;
+      }
+    };
+    $('cVL').onchange = () => {
+      try { localStorage.setItem(VON, $('cVL').checked ? '1' : '0'); } catch (e) {}
+      if ($('cVL').checked && !vlKey()) alert('SDK キーを入れて「保存」を押してください。');
+      // ★S68 説明文と警告帯を すぐ合わせる
+      hud('AR の開き方を切り替えました。画面を開き直すと 説明の表示も変わります。');
+      try { swapUsdz(); } catch (e) {}
+    };
+    $('vlSave').onclick = () => {
+      const k = $('vlKey').value.trim();
+      try { localStorage.setItem(VKEY, k); } catch (e) {}
+      $('vlSave').textContent = k ? '保存した' : '消した';
+      setTimeout(() => { $('vlSave').textContent = '保存'; }, 1500);
+    };
+    vlNote();
+  }
+
+  // ★S63 スナップの入／切
+  if ($('cSnap')) {
+    $('cSnap').checked = snapOn;
+    $('cSnap').onchange = () => { snapOn = $('cSnap').checked; };
+  }
   renderer.domElement.addEventListener('pointerdown', onDown);
   renderer.domElement.addEventListener('pointerup', onUp);
 }
@@ -384,29 +507,144 @@ function onUp(e) {
   raycaster.setFromCamera(p, camera);
   const targets = Object.values(meshes).filter(o => o.visible && o.isMesh);
   const hits = raycaster.intersectObjects(targets, false);
-  if (!hits.length) { if (!measureMode) hud(''); return; }
-  const w = hits[0].point.clone(); root.worldToLocal(w);   // モデル座標へ
-  const m = { e: w.x, n: w.y, z: w.z };
+  // ★S63 計測中は まず 特徴線の節点／線上に吸い付く（面より優先）
+  const sn = measureMode ? findSnap(e.clientX - r.left, e.clientY - r.top) : null;
+  if (!sn && !hits.length) { if (!measureMode) hud(''); return; }
+  let m, src;
+  if (sn) {
+    m = sn.m; src = `★${sn.kind}　${sn.name.replace(/^線_/, '')}`;
+  } else {
+    const w = hits[0].point.clone(); root.worldToLocal(w);   // モデル座標へ
+    m = { e: w.x, n: w.y, z: w.z }; src = hits[0].object.name;
+  }
   const st = station(m.e, m.n);
   const sv = toSv(st.s);
   const info = `<b>${noText(sv)}</b>　離れ <span class="mono">${F(Math.abs(st.off))}</span> m`
     + `（${st.off < 0 ? '左岸' : '右岸'}）　標高 <span class="mono">${F(m.z)}</span> m`
-    + `<br><span class="k">設計追距 ${F(st.s)}／${hits[0].object.name}`
+    + `<br><span class="k">設計追距 ${F(st.s)}／${src}`
     + `／実座標 X=${F(m.n + M.origin.X0)} Y=${F(m.e + M.origin.Y0)}</span>`;
   if (!measureMode) { hud(info); return; }
-  picks.push({ m, st, sv });
-  mark(m);
+  picks.push({ m, st, sv, src });
+  mark(m, !!sn);
   if (picks.length === 1) { hud(info + '<br>2点目をタップしてください。'); return; }
   const a = picks[0].m, b = picks[1].m;
   const dh = Math.hypot(b.e - a.e, b.n - a.n), dz = b.z - a.z;
   hud(`<b>計測</b>　水平 <span class="mono">${F(dh)}</span> m　`
     + `比高 <span class="mono">${dz >= 0 ? '+' : ''}${F(dz)}</span> m　`
     + `斜距離 <span class="mono">${F(Math.hypot(dh, dz))}</span> m`
-    + `<br><span class="k">① ${noText(picks[0].sv)} 離れ ${F(Math.abs(picks[0].st.off))} 標高 ${F(a.z)}`
-    + `<br>② ${noText(picks[1].sv)} 離れ ${F(Math.abs(picks[1].st.off))} 標高 ${F(b.z)}</span>`);
+    + `<br><span class="k">① ${noText(picks[0].sv)} 離れ ${F(Math.abs(picks[0].st.off))} 標高 ${F(a.z)}　${picks[0].src}`
+    + `<br>② ${noText(picks[1].sv)} 離れ ${F(Math.abs(picks[1].st.off))} 標高 ${F(b.z)}　${picks[1].src}</span>`);
   picks.length = 0;
   setTimeout(clearMarks, 6000);
 }
+// ★S63 計測のスナップ（特徴線の 節点 と 線上）
+//   特徴線の節点は そのまま ★出来形計測対象点（法肩・天端頂点・天端外縁・法尻…
+//   張ブロックや基礎の角）なので、そこに吸い付けば 手で狙うより ずっと正確に測れる。
+//   面をそのまま拾うと 三角形のどこか になり、0.01 m 単位で ばらつく。
+let snapOn = true;
+let SNAP = null;         // {p: Float32Array(xyz…), li: Int32Array(線の番号), end: Uint8Array, names: []}
+const SNAP_PX = 22;      // 節点に吸い付く画面上の半径（px）
+const SNAP_LPX = 14;     // 線に吸い付く半径（px）
+
+function buildSnap() {
+  const xs = [], li = [], en = [], names = [];
+  M.lines.forEach((l, k) => {
+    names.push(l.name);
+    for (const poly of l.p) {
+      for (let i = 0; i < poly.length; i++) {
+        xs.push(poly[i][0], poly[i][1], poly[i][2]);
+        li.push(k); en.push(i === 0 || i === poly.length - 1 ? 1 : 0);
+      }
+    }
+  });
+  SNAP = { p: new Float32Array(xs), li: Int32Array.from(li), end: Uint8Array.from(en), names };
+}
+
+const _s1 = new THREE.Vector3(), _s2 = new THREE.Vector3(), _s3 = new THREE.Vector3();
+let _sw = 0, _sh = 0;      // ★画面の大きさは findSnap の頭で1回だけ読む
+// 画面座標（px）に落とす。カメラの後ろなら null
+//   ★getBoundingClientRect() をここで呼ぶと 1万回のレイアウト読み取りになって
+//     端末で固まる。必ず外で読んで _sw/_sh に入れておくこと
+function toScreen(v, out) {
+  _s3.copy(v).applyMatrix4(root.matrixWorld);
+  const cam = _s3.distanceTo(camera.position);
+  _s3.project(camera);
+  if (_s3.z > 1) return null;
+  out.x = (_s3.x + 1) / 2 * _sw; out.y = (1 - _s3.y) / 2 * _sh;
+  return cam;
+}
+
+// 画面の (px,py) に いちばん近い スナップ先を返す
+function findSnap(px, py) {
+  if (!snapOn || !SNAP) return null;
+  const rr = renderer.domElement.getBoundingClientRect();
+  _sw = rr.width; _sh = rr.height;
+  const vis = SNAP.names.map(n => { const o = meshes[n]; return !!(o && o.visible); });
+  const q = new THREE.Vector2();
+  const R2 = SNAP_PX * SNAP_PX;
+  let best = null;
+  const P = SNAP.p;
+  for (let i = 0, j = 0; j < P.length; i++, j += 3) {
+    if (!vis[SNAP.li[i]]) continue;
+    _s1.set(P[j], P[j + 1], P[j + 2]);
+    const cam = toScreen(_s1, q);
+    if (cam === null) continue;
+    const dd = (q.x - px) * (q.x - px) + (q.y - py) * (q.y - py);
+    if (dd > R2) continue;
+    // ★ほぼ同じ所に重なっているときは 手前の点を選ぶ
+    if (!best || dd < best.dd - 36 || (dd < best.dd + 36 && cam < best.cam)) {
+      best = { dd, cam, i, name: SNAP.names[SNAP.li[i]], end: SNAP.end[i] };
+    }
+  }
+  if (best) {
+    const j = best.i * 3;
+    return { m: { e: P[j], n: P[j + 1], z: P[j + 2] },
+             kind: best.end ? '端点' : '節点', name: best.name };
+  }
+  // ★節点が無ければ 線の上（垂線の足）に吸い付く
+  const R2L = SNAP_LPX * SNAP_LPX;
+  const a = new THREE.Vector2(), b = new THREE.Vector2();
+  let bl = null;
+  M.lines.forEach((l, k) => {
+    const o = meshes[l.name]; if (!o || !o.visible) return;
+    for (const poly of l.p) {
+      for (let i = 0; i < poly.length - 1; i++) {
+        _s1.fromArray(poly[i]); if (toScreen(_s1, a) === null) continue;
+        _s2.fromArray(poly[i + 1]); const c2 = toScreen(_s2, b); if (c2 === null) continue;
+        const vx = b.x - a.x, vy = b.y - a.y;
+        const L2 = vx * vx + vy * vy; if (L2 < 1e-9) continue;
+        let t = ((px - a.x) * vx + (py - a.y) * vy) / L2;
+        t = Math.max(0, Math.min(1, t));
+        const qx = a.x + vx * t, qy = a.y + vy * t;
+        const dd = (qx - px) * (qx - px) + (qy - py) * (qy - py);
+        if (dd > R2L) continue;
+        if (!bl || dd < bl.dd) {
+          bl = { dd, name: l.name,
+                 m: { e: poly[i][0] + (poly[i + 1][0] - poly[i][0]) * t,
+                      n: poly[i][1] + (poly[i + 1][1] - poly[i][1]) * t,
+                      z: poly[i][2] + (poly[i + 1][2] - poly[i][2]) * t } };
+        }
+      }
+    }
+  });
+  return bl ? { m: bl.m, kind: '線上', name: bl.name } : null;
+}
+
+// ★S64 回転が速すぎる件（とくに寄っているとき）
+//   OrbitControls の回転は「画面の高さいっぱいのドラッグ ＝ 約180°」で、
+//   ★カメラが近いか遠いかに関係なく 同じ角度だけ回る。
+//   寄っているときは 画面に写る範囲が狭いので、同じ角度でも 振れ幅が大きく感じる。
+//   → ★注視点までの距離で 回転の速さを変える。
+//   速さを変えたいときは 下の3つの数字だけ直せばよい。
+const ROT_FAR  = 0.60;   // 引いているとき（既定の 1.0 より遅い）
+const ROT_NEAR = 0.15;   // 寄っているとき（引いているときの 1/4）
+const ROT_D    = 60;     // この距離（m）以上は ROT_FAR のまま
+function rotSpeed() {
+  if (!controls) return;
+  const d = camera.position.distanceTo(controls.target);
+  controls.rotateSpeed = ROT_NEAR + (ROT_FAR - ROT_NEAR) * Math.min(1, d / ROT_D);
+}
+
 // ★S61 ズームの狙いを決める
 const _pt = new THREE.Vector2();
 const _vd = new THREE.Vector3();
@@ -437,9 +675,10 @@ function aimZoom(clientX, clientY) {
 //   張ブロックの厚みが 0.12 m なので 寄るほど 球で狙った点が隠れる。
 //   ★画面上の大きさを一定（半径 MARK_PX ピクセル）にして、寄っても大きくならないようにした。
 const MARK_PX = 4.5;            // 画面上の半径（ピクセル）。直径 9 px くらいの点
-function mark(m) {
+function mark(m, snapped) {
+  // ★S63 スナップしたときは 水色の点にして 吸い付いたことが分かるようにする
   const s = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8),
-    new THREE.MeshBasicMaterial({ color: 0xd23b2f, depthTest: false }));
+    new THREE.MeshBasicMaterial({ color: snapped ? 0x0aa3c2 : 0xd23b2f, depthTest: false }));
   s.position.set(m.e, m.n, m.z); s.renderOrder = 9; markGrp.add(s);
   sizeMarks();
 }
@@ -486,17 +725,54 @@ function initAR() {
   reticle.matrixAutoUpdate = false; reticle.visible = false; scene.add(reticle);
 
   // iPhone/iPad は AR Quick Look（USDZ）、Android は WebXR に振り分ける
-  const a = document.createElement('a');
-  const quickLook = a.relList && a.relList.supports && a.relList.supports('ar');
+  // ★S66 WebXR がある端末は そちらを使う。
+  //   Variant のビューアの中では navigator.xr が生えるので ここで false になり、
+  //   そのまま Android と同じ 鋲基準の AR に入る。
+  const quickLook = isQuickLook();
   if (quickLook) { $('bAR').textContent = 'AR（実寸）'; }
   // ★S47 この端末で 下の版の選択が効くのかどうかを その場で出す
-  $('uPlat').innerHTML = quickLook
-    ? '★この端末は <b>iPhone / iPad</b> です。AR（実寸）は Quick Look で開くので、下の選択が効きます。'
-    : '★この端末は <b>Android など</b>です。AR は <b>WebXR</b>（鋲基準）で開くので、'
-      + '<b>下の選択は使いません</b>。全部品が はじめから正しい高さで出ます。';
+  // ★S68 Variant Launch を使うときは 下の datum 選択は使わない。
+  //   3通りの言い方を きちんと出し分ける（誤解のもとになるため）
+  const vlUse = quickLook && vlOn() && vlKey();
+  $('uPlat').innerHTML =
+    !quickLook
+      ? '★この端末は <b>Android など</b>です。AR は <b>WebXR</b>（鋲基準）で開くので、'
+        + '<b>下の選択は使いません</b>。全部品が はじめから正しい高さで出ます。'
+    : vlUse
+      ? '★この端末は <b>iPhone / iPad</b> です。いまは <b>Variant Launch 経由の WebXR</b>'
+        + '（鋲基準）で開く設定なので、<b>下の選択は使いません</b>。'
+        + '全部品が はじめから正しい高さで出ます。<br>'
+        + '※ Quick Look に戻したいときは 下の「AR（iPhone / iPad・実験）」の目を外してください。'
+      : '★この端末は <b>iPhone / iPad</b> です。AR（実寸）は <b>Quick Look</b> で開くので、'
+        + '下の選択が効きます。';
 
   $('bAR').onclick = async () => {
-    if (quickLook) { $('arq').click(); return; }      // iOS：Quick Look で 1:1 配置
+    if (quickLook) {
+      // ★S66 目が入っていて キーがあれば Variant Launch の App Clip へ回す
+      if (vlOn() && vlKey()) {
+        $('bAR').textContent = '準備中…';
+        const r = await vlLoad();                     // ★S69 待ち方を直した
+        $('bAR').textContent = 'AR（実寸）';
+        let why = r.why;
+        const d = r.detail || vlState || {};
+        if (r.ok) {
+          // ★この端末が そもそも対象外なら 素直に Quick Look へ（黙って回す）
+          if (d.webXRStatus === 'unsupported') {
+            $('arq').click(); return;
+          }
+          try {
+            const u = new URL(location.href); u.searchParams.set('vlxr', '1');
+            const lu = VLaunch.getLaunchUrl(u.toString());
+            if (lu) { location.href = lu; return; }
+            why = '飛び先（launchUrl）が作れませんでした。';
+          } catch (e) { why = '飛び先を作るときに止まりました：' + e; }
+        }
+        alert('Variant Launch を開始できませんでした。\n'
+            + (why ? '\n' + why + '\n' : '')
+            + '\nこのまま Quick Look で開きます。');
+      }
+      $('arq').click(); return;                       // iOS：Quick Look で 1:1 配置
+    }
     if (xrSession) { xrSession.end(); return; }
     if (!navigator.xr) { alert('この端末／ブラウザは現地 AR に未対応です。\niPhone/iPad は Safari で開いてください（AR Quick Look を使います）。\nAndroid は Chrome でお使いください。'); return; }
     if (!await navigator.xr.isSessionSupported('immersive-ar')) {
@@ -546,8 +822,14 @@ function arApply() {
 }
 
 async function startAR() {
+  // ★S66 Variant のビューアの中では dom-overlay を ★必須にする
+  //   任意のままだと 画面の UI（高さスライダーなど）が出ないことがある
+  const vlx = (() => { try {
+    return new URLSearchParams(location.search).get('vlxr') === '1';
+  } catch (e) { return false; } })();
   const session = await navigator.xr.requestSession('immersive-ar', {
-    requiredFeatures: ['hit-test'], optionalFeatures: ['dom-overlay'],
+    requiredFeatures: vlx ? ['hit-test', 'dom-overlay'] : ['hit-test'],
+    optionalFeatures: vlx ? [] : ['dom-overlay'],
     domOverlay: { root: document.body },
   });
   xrSession = session;
@@ -932,7 +1214,9 @@ function initFit() {
     try { localStorage.setItem(LKEY, lock ? '1' : '0'); } catch (e) {}
     $('arq').setAttribute('href', f + (lock ? '#allowsContentScaling=0' : ''));
     // ★S46 全体版は高さを合わせられない（levitate は上方向だけ）。選んだら警告を出す
-    $('uWarn').style.display = $('uFull').checked ? '' : 'none';
+    // ★S68 Variant 経由のときは Quick Look の高さ制約は関係ないので出さない
+    const vlNow = isQuickLook() && vlOn() && vlKey();
+    $('uWarn').style.display = ($('uFull').checked && !vlNow) ? '' : 'none';
   };
   try { $('uLock').checked = (localStorage.getItem(LKEY) !== '0'); } catch (e) {}   // 既定は固定する
   $('uFull').onchange = swapUsdz; $('uGround').onchange = swapUsdz; $('uBank').onchange = swapUsdz;
