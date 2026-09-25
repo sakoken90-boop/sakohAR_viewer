@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 28;
+const APP_V = 29;
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -379,6 +379,9 @@ function bindUI() {
     $('cVL').onchange = () => {
       try { localStorage.setItem(VON, $('cVL').checked ? '1' : '0'); } catch (e) {}
       if ($('cVL').checked && !vlKey()) alert('SDK キーを入れて「保存」を押してください。');
+      // ★S68 説明文と警告帯を すぐ合わせる
+      hud('AR の開き方を切り替えました。画面を開き直すと 説明の表示も変わります。');
+      try { swapUsdz(); } catch (e) {}
     };
     $('vlSave').onclick = () => {
       const k = $('vlKey').value.trim();
@@ -689,10 +692,20 @@ function initAR() {
   const quickLook = isQuickLook();
   if (quickLook) { $('bAR').textContent = 'AR（実寸）'; }
   // ★S47 この端末で 下の版の選択が効くのかどうかを その場で出す
-  $('uPlat').innerHTML = quickLook
-    ? '★この端末は <b>iPhone / iPad</b> です。AR（実寸）は Quick Look で開くので、下の選択が効きます。'
-    : '★この端末は <b>Android など</b>です。AR は <b>WebXR</b>（鋲基準）で開くので、'
-      + '<b>下の選択は使いません</b>。全部品が はじめから正しい高さで出ます。';
+  // ★S68 Variant Launch を使うときは 下の datum 選択は使わない。
+  //   3通りの言い方を きちんと出し分ける（誤解のもとになるため）
+  const vlUse = quickLook && vlOn() && vlKey();
+  $('uPlat').innerHTML =
+    !quickLook
+      ? '★この端末は <b>Android など</b>です。AR は <b>WebXR</b>（鋲基準）で開くので、'
+        + '<b>下の選択は使いません</b>。全部品が はじめから正しい高さで出ます。'
+    : vlUse
+      ? '★この端末は <b>iPhone / iPad</b> です。いまは <b>Variant Launch 経由の WebXR</b>'
+        + '（鋲基準）で開く設定なので、<b>下の選択は使いません</b>。'
+        + '全部品が はじめから正しい高さで出ます。<br>'
+        + '※ Quick Look に戻したいときは 下の「AR（iPhone / iPad・実験）」の目を外してください。'
+      : '★この端末は <b>iPhone / iPad</b> です。AR（実寸）は <b>Quick Look</b> で開くので、'
+        + '下の選択が効きます。';
 
   $('bAR').onclick = async () => {
     if (quickLook) {
@@ -1153,7 +1166,9 @@ function initFit() {
     try { localStorage.setItem(LKEY, lock ? '1' : '0'); } catch (e) {}
     $('arq').setAttribute('href', f + (lock ? '#allowsContentScaling=0' : ''));
     // ★S46 全体版は高さを合わせられない（levitate は上方向だけ）。選んだら警告を出す
-    $('uWarn').style.display = $('uFull').checked ? '' : 'none';
+    // ★S68 Variant 経由のときは Quick Look の高さ制約は関係ないので出さない
+    const vlNow = isQuickLook() && vlOn() && vlKey();
+    $('uWarn').style.display = ($('uFull').checked && !vlNow) ? '' : 'none';
   };
   try { $('uLock').checked = (localStorage.getItem(LKEY) !== '0'); } catch (e) {}   // 既定は固定する
   $('uFull').onchange = swapUsdz; $('uGround').onchange = swapUsdz; $('uBank').onchange = swapUsdz;

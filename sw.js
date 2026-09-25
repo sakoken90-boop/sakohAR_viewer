@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v28';  // ★S67 Variant Launch の SDK キーを組み込み iOS で既定 入にした
+const V = 'sd-viewer-v29';  // ★S68 AR の説明文を Variant 経由かどうかで出し分けた
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
