@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v32';  // ★S72 知らせを最優先で待つ＋飛び先ができるまで粘る
+const V = 'sd-viewer-v33';  // ★S73 Variant の中では SDK を読んで xr を生やす
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

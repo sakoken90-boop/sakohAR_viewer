@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 32;
+const APP_V = 33;
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -97,6 +97,39 @@ function vlLoad() {
            + 'が登録されているか 確かめてください（★省略なしの全部）。' });
     }, 8000);
   });
+}
+
+// ★S73 ここが 見落としだった。
+//   Variant のビューア（App Clip）の中でも、★ページが SDK を読み込まなければ
+//   navigator.xr は 生えない（★WebXR を注いでいるのは SDK 自身）。
+//   S66 で「SDK は 押したときだけ読む」ようにしたせいで、開き直した先では
+//   xr が無いまま → isQuickLook() が true → AR を押しても Quick Look に回り、
+//   App Clip の中では USDZ も開かないので ★「無反応」に見えていた。
+//   → ★?vlxr=1 が付いていたら 開いた時点で SDK を読み、xr が生えるのを待つ。
+function isVlx() {
+  try { return new URLSearchParams(location.search).get('vlxr') === '1'; }
+  catch (e) { return false; }
+}
+function waitXR(ms) {
+  return new Promise((res) => {
+    if (navigator.xr) return res(true);
+    const t0 = Date.now();
+    const t = setInterval(() => {
+      if (navigator.xr) { clearInterval(t); res(true); }
+      else if (Date.now() - t0 > ms) { clearInterval(t); res(false); }
+    }, 200);
+  });
+}
+// ★Variant のビューアの中で WebXR を用意する
+//   一度 駄目だったら ★二度目からは 待たない（押すたびに 8 秒 待たせない）
+let vlXRNG = false;
+async function vlPrepXR(ms) {
+  if (navigator.xr) return true;
+  if (vlXRNG) return false;
+  await vlLoad();                       // ★SDK を読む＝これが xr を生やす
+  const ok = await waitXR(ms || 8000);
+  if (!ok) vlXRNG = true;
+  return ok;
 }
 
 // ★S72 飛び先が作れるまで 粘る（初期化が遅れているだけのことがある）
@@ -287,11 +320,15 @@ async function init() {
   });
   renderer.setAnimationLoop(tick);
   initAR();
-  // ★S66 Variant のビューアの中で開き直されたときは そのまま AR に入る
+  // ★S66→S73 Variant のビューアの中で開き直されたときは そのまま AR に入る
+  //   ★xr は まだ無い。SDK を読んでから 生えるのを待つ（最大 10 秒）
   try {
-    if (new URLSearchParams(location.search).get('vlxr') === '1' && navigator.xr) {
-      hud('現地 AR を開きます…');
-      setTimeout(() => { const b = $('bAR'); if (b) b.click(); }, 900);
+    if (isVlx()) {
+      hud('現地 AR の準備をしています…（10 秒ほど）');
+      vlPrepXR(10000).then((ok) => {
+        if (ok) { hud('現地 AR を開きます…'); setTimeout(() => { const b = $('bAR'); if (b) b.click(); }, 500); }
+        else hud('★この画面では WebXR が見つかりませんでした。「AR」を押すと Quick Look で開きます。');
+      });
     }
   } catch (e) {}
 }
@@ -803,7 +840,21 @@ function initAR() {
         + '下の選択が効きます。';
 
   $('bAR').onclick = async () => {
-    if (quickLook) {
+    // ★S73 押すたびに 見直す。Variant のビューアの中では
+    //   SDK を読んだ あとから navigator.xr が生えるので、開いた時の判定を信じない
+    if (isVlx() && !navigator.xr) {
+      $('bAR').textContent = '準備中…（AR）';
+      await vlPrepXR(8000);
+      $('bAR').textContent = 'AR（実寸）';
+    }
+    const ql = isQuickLook();
+    if (ql) {
+      // ★S73 すでに Variant のビューアの中なら もう飛ばさない（堂々めぐりになる）
+      if (isVlx()) {
+        alert('この画面では 現地 AR（WebXR）が用意できませんでした。\n'
+            + 'このまま Quick Look（下端が床基準）で開きます。');
+        $('arq').click(); return;
+      }
       // ★S66 目が入っていて キーがあれば Variant Launch の App Clip へ回す
       if (vlOn() && vlKey()) {
         $('bAR').textContent = '準備中…';
