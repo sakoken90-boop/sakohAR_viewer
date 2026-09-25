@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v26';  // ★S65 階段の幅を 2.000 m 一定にした（モデル更新）
+const V = 'sd-viewer-v28';  // ★S67 Variant Launch の SDK キーを組み込み iOS で既定 入にした
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

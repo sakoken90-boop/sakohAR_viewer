@@ -230,6 +230,24 @@ input[type=range]{width:100%}
   </div>
 
   <div class="sec">
+    <h3>AR（iPhone / iPad・実験）</h3>
+    <label><input type="checkbox" id="cVL"> ★Variant Launch で 現地AR（鋲基準）を使う</label>
+    <div class="row" style="margin-top:6px">
+      <input type="text" id="vlKey" placeholder="SDK キー" autocapitalize="off" autocorrect="off"
+             spellcheck="false" style="flex:1;padding:6px">
+      <button class="btn" id="vlSave">保存</button>
+    </div>
+    <div class="tiny">iPhone / iPad の Safari は WebXR に対応していないので、
+      そのままだと AR Quick Look（★下端が床基準）になります。
+      ★Variant Launch の App Clip を経由すると、Android と同じ ★鋲基準の AR が使えます。
+      <br>★SDK キーは すでに組み込んであるので <b>このままチェックを入れたまま使えます</b>。
+      上の欄は 別のキーに差し替えたいときだけ使ってください（この端末にだけ保存されます）。
+      <br>★チェックを外せば 従来どおり Quick Look で開きます。
+      Android には いっさい影響しません。
+      <br>★無料枠（3,000 ビュー/月）なので、AR に入る前に Variant のカードが1枚はさまります。</div>
+  </div>
+
+  <div class="sec">
     <h3>計測</h3>
     <label><input type="checkbox" id="cSnap" checked> ★スナップ（特徴線の節点に吸い付く）</label>
     <div class="tiny">法肩・天端頂点・天端外縁・法尻・張ブロックや基礎の角など、

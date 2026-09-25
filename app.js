@@ -13,7 +13,50 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 26;                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
+const APP_V = 28;
+
+// ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
+//   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
+//   AR Quick Look（USDZ・下端が床基準）で開いている。
+//   Variant Launch は ★App Clip の中で 本物の WebXR を注入するしくみで、
+//   hit-test／dom-overlay／anchors とも対応している（Release 扱い）。
+//   → ★キーを入れて 目を入れたときだけ そちらへ回す。
+//     キーが無ければ 何も読み込まず、従来どおり Quick Look で開く。
+//     ★Android には いっさい影響しない。
+//   ★S67 SDK キーを埋め込んだ（launchar.app の Developer 枠）。
+//     このキーは ★ドメインに紐づく公開キー で、ブラウザに読ませる前提のもの。
+//     公開リポジトリに入るが、登録したドメイン以外では使えない。
+//     ★スクリプトの読み込みに redirect=true は付けない。
+//       付けると iOS の人が ページを開いた瞬間に Launch Card へ飛ばされてしまい、
+//       3D を見たいだけのときに 邪魔になる。★AR を押したときだけ飛ばす。
+const VL_KEY = 'FGPbJOgFWENTTF9nLyeQzsHPDZFUYmGo';
+const VKEY = 'sd_vlkey', VON = 'sd_vlon';
+const vlKey = () => { try { return localStorage.getItem(VKEY) || VL_KEY; } catch (e) { return VL_KEY; } };
+// ★キーが埋め込んであれば 既定で「入」。端末で切ることもできる
+const vlOn  = () => {
+  try { const v = localStorage.getItem(VON); if (v !== null) return v === '1'; } catch (e) {}
+  return !!VL_KEY;
+};
+// ★この端末は AR Quick Look 行きか（＝WebXR が無い iPhone / iPad か）
+//   initAR() と 設定パネルの両方から見るので 関数にしてある
+function isQuickLook() {
+  if (navigator.xr) return false;                 // WebXR があれば そちら
+  const a = document.createElement('a');
+  return !!(a.relList && a.relList.supports && a.relList.supports('ar'));
+}
+// SDK は ★使うときにだけ 読み込む（未設定なら 通信もしない）
+function vlLoad() {
+  return new Promise((res) => {
+    if (window.VLaunch) return res(true);
+    const k = vlKey(); if (!k) return res(false);
+    const sc = document.createElement('script');
+    sc.src = 'https://launchar.app/sdk/v1?key=' + encodeURIComponent(k);
+    sc.onload = () => res(!!window.VLaunch);
+    sc.onerror = () => res(false);
+    document.head.appendChild(sc);
+    setTimeout(() => res(!!window.VLaunch), 8000);      // 保険
+  });
+}                 // ★S58 画面の副題に出す。★sw.js の版と必ず合わせる
 let home = null;                   // ★S58 起動時のカメラ（「全体」で戻る先）
 let measureMode = false; const picks = [];
 const planes = [new THREE.Plane(), new THREE.Plane()];
@@ -149,6 +192,13 @@ async function init() {
   });
   renderer.setAnimationLoop(tick);
   initAR();
+  // ★S66 Variant のビューアの中で開き直されたときは そのまま AR に入る
+  try {
+    if (new URLSearchParams(location.search).get('vlxr') === '1' && navigator.xr) {
+      hud('現地 AR を開きます…');
+      setTimeout(() => { const b = $('bAR'); if (b) b.click(); }, 900);
+    }
+  } catch (e) {}
 }
 
 function onResize() {
@@ -317,6 +367,28 @@ function bindUI() {
         + (snapOn ? '<br><span class="k">★特徴線の節点（法肩・天端・法尻・ブロックの角など）に吸い付きます。'
                     + '外すときは 表示 →「計測」→ スナップ の目を外す</span>' : '')) : '');
   };
+  // ★S66 Variant Launch（iOS の鋲基準 AR）の設定
+  if ($('cVL')) {
+    $('cVL').checked = vlOn();
+    $('vlKey').value = vlKey();
+    const vlNote = () => {
+      if (!isQuickLook()) {                          // Android など では触れない
+        $('cVL').disabled = true; $('vlKey').disabled = true; $('vlSave').disabled = true;
+      }
+    };
+    $('cVL').onchange = () => {
+      try { localStorage.setItem(VON, $('cVL').checked ? '1' : '0'); } catch (e) {}
+      if ($('cVL').checked && !vlKey()) alert('SDK キーを入れて「保存」を押してください。');
+    };
+    $('vlSave').onclick = () => {
+      const k = $('vlKey').value.trim();
+      try { localStorage.setItem(VKEY, k); } catch (e) {}
+      $('vlSave').textContent = k ? '保存した' : '消した';
+      setTimeout(() => { $('vlSave').textContent = '保存'; }, 1500);
+    };
+    vlNote();
+  }
+
   // ★S63 スナップの入／切
   if ($('cSnap')) {
     $('cSnap').checked = snapOn;
@@ -611,8 +683,10 @@ function initAR() {
   reticle.matrixAutoUpdate = false; reticle.visible = false; scene.add(reticle);
 
   // iPhone/iPad は AR Quick Look（USDZ）、Android は WebXR に振り分ける
-  const a = document.createElement('a');
-  const quickLook = a.relList && a.relList.supports && a.relList.supports('ar');
+  // ★S66 WebXR がある端末は そちらを使う。
+  //   Variant のビューアの中では navigator.xr が生えるので ここで false になり、
+  //   そのまま Android と同じ 鋲基準の AR に入る。
+  const quickLook = isQuickLook();
   if (quickLook) { $('bAR').textContent = 'AR（実寸）'; }
   // ★S47 この端末で 下の版の選択が効くのかどうかを その場で出す
   $('uPlat').innerHTML = quickLook
@@ -621,7 +695,23 @@ function initAR() {
       + '<b>下の選択は使いません</b>。全部品が はじめから正しい高さで出ます。';
 
   $('bAR').onclick = async () => {
-    if (quickLook) { $('arq').click(); return; }      // iOS：Quick Look で 1:1 配置
+    if (quickLook) {
+      // ★S66 目が入っていて キーがあれば Variant Launch の App Clip へ回す
+      if (vlOn() && vlKey()) {
+        $('bAR').textContent = '準備中…';
+        const ok = await vlLoad();
+        $('bAR').textContent = 'AR（実寸）';
+        if (ok && window.VLaunch && VLaunch.getLaunchUrl) {
+          try {
+            const u = new URL(location.href); u.searchParams.set('vlxr', '1');
+            location.href = VLaunch.getLaunchUrl(u.toString());
+            return;
+          } catch (e) { /* 落ちたら Quick Look に回す */ }
+        }
+        alert('Variant Launch を開始できませんでした。\nSDK キーと ドメインの登録を確かめてください。\nこのまま Quick Look で開きます。');
+      }
+      $('arq').click(); return;                       // iOS：Quick Look で 1:1 配置
+    }
     if (xrSession) { xrSession.end(); return; }
     if (!navigator.xr) { alert('この端末／ブラウザは現地 AR に未対応です。\niPhone/iPad は Safari で開いてください（AR Quick Look を使います）。\nAndroid は Chrome でお使いください。'); return; }
     if (!await navigator.xr.isSessionSupported('immersive-ar')) {
@@ -671,8 +761,14 @@ function arApply() {
 }
 
 async function startAR() {
+  // ★S66 Variant のビューアの中では dom-overlay を ★必須にする
+  //   任意のままだと 画面の UI（高さスライダーなど）が出ないことがある
+  const vlx = (() => { try {
+    return new URLSearchParams(location.search).get('vlxr') === '1';
+  } catch (e) { return false; } })();
   const session = await navigator.xr.requestSession('immersive-ar', {
-    requiredFeatures: ['hit-test'], optionalFeatures: ['dom-overlay'],
+    requiredFeatures: vlx ? ['hit-test', 'dom-overlay'] : ['hit-test'],
+    optionalFeatures: vlx ? [] : ['dom-overlay'],
     domOverlay: { root: document.body },
   });
   xrSession = session;
