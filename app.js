@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 37;
+const APP_V = 38;
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -931,6 +931,8 @@ function initAR() {
     catch (e) { hud(''); }
   };
   $('anchor').onchange = () => { if (anchorW) arApply(); };
+  const bEnd = $('bAREnd');                      // ★S78 AR用UO の中の 終了ボタン
+  if (bEnd) bEnd.onclick = () => { if (xrSession) xrSession.end(); };
   $('arRot').oninput = () => { heading = headingBase + THREE.MathUtils.degToRad(+$('arRot').value); $('arRotV').textContent = (+$('arRot').value).toFixed(1) + '°'; arApply(); };
   $('arZ').oninput = () => { zOff = +$('arZ').value / 100; $('arZV').textContent = zOff.toFixed(2); arApply(); };
   $('bPlace').onclick = () => {
@@ -986,8 +988,28 @@ function arApply() {
 //   ★セッションに入った後の DOM の書き換えが 画面に出ないことがある。
 //   実際 S75 で入れた「①カメラの起動…」の表示も ★一度も出なかった。
 //   → ★入る前に AR の見た目にしてしまう。しくじったら 戻す。
+// ★S78 重ね表示の 入れ物。
+//   Variant の dom-overlay は「★root 以外を隠す」まね事なので、
+//   ★3D の画（canvas）と AR用UI を ★ひとつの箱に入れて、その箱を root にする。
+//   body を root にしていた S77 までは、その子が まるごと隠れていたとみられる
+//   （カメラだけ見えて モデルも ボタンも 出なかった）。
+function arOverlay(on) {
+  try {
+    let ov = document.getElementById('arov');
+    if (on) {
+      if (!ov) { ov = document.createElement('div'); ov.id = 'arov'; document.body.appendChild(ov); }
+      ov.appendChild($('cv'));          // ★入れ替え（appendChild は 移動）
+      ov.appendChild($('arui'));
+      return ov;
+    }
+    if (ov) { document.body.appendChild($('cv')); document.body.appendChild($('arui')); }
+    return null;
+  } catch (e) { return null; }
+}
+
 function arSkin(on) {
   try {
+    arOverlay(on);                       // ★S78 先に 箱に入れる／出す
     document.documentElement.classList.toggle('arx', on);
     document.body.classList.toggle('arx', on);
     try { renderer.setClearAlpha(on ? 0 : 1); } catch (e) {}
@@ -1031,7 +1053,11 @@ async function startAR() {
     const session = await withTimeout(navigator.xr.requestSession('immersive-ar', {
       requiredFeatures: vlx ? ['hit-test', 'dom-overlay'] : ['hit-test'],
       optionalFeatures: vlx ? [] : ['dom-overlay'],
-      domOverlay: { root: document.body },
+      // ★S78 root を ★body から #arui に変えた。
+      //   Variant は「root 以外を隠す」まね事なので、body を渡すと
+      //   ★body の子（ヘッダー・AR用UI）が まるごと隠れていたとみられる。
+      //   先方も「フレームワークが触らない 専用の箱」を root に、と書いている。
+      domOverlay: { root: document.getElementById('arov') || document.body },
     }), 20000, '①カメラの起動');
     xrSession = session;
 
@@ -1053,10 +1079,32 @@ async function startAR() {
       step('　→ 床の検出 ★使える');
     } catch (e) { hitSource = null; step('　→ 床の検出 は使えない（' + ((e && e.message) || e) + '）'); }
 
+    // ★S78 ★arFrame を待たずに ここで 仮置きする。
+    //   local の原点は ★セッションを始めた時の端末の位置・向き なので、
+    //   (0, -1.2, -3) は「★始めた時の 目の前 3 m・1.2 m 下」になる。
+    //   S77 は arFrame の中で置いていたが、それが 呼ばれていない疑いがある
+    if (!anchorW) { anchorW = new THREE.Vector3(0, -1.2, -3); arProv = true; arApply(); }
+
     step('⑤できあがり');
     $('arTip').textContent = hitSource
       ? '床を映して輪郭が出たら「① 足元に合わせる」を押してください。'
       : '★床の検出が使えませんでした。画面の中央が 足元に来るように構えて「① 足元に合わせる」を押してください。';
+
+    // ★S78 ★画面タップは XR の select で拾う。
+    //   これは dom-overlay が効いていなくても 必ず届く（WebXR の決まり）。
+    //   ★1回 → ①足元に合わせる ／ ★2回（0.6 秒以内）→ ②向きを合わせる
+    let selT = 0, selTimer = null;
+    session.addEventListener('select', () => {
+      const now = Date.now();
+      if (now - selT < 600) {
+        selT = 0; if (selTimer) { clearTimeout(selTimer); selTimer = null; }
+        try { $('bHeading').click(); } catch (e) {}
+        return;
+      }
+      selT = now;
+      selTimer = setTimeout(() => { selTimer = null; selT = 0;
+        try { $('bPlace').click(); } catch (e) {} }, 620);
+    });
 
     session.addEventListener('end', () => {
       arSkin(false);                                  // ★S76 見た目を 戻す

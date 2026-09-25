@@ -24,6 +24,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:transparent;color:var(
    先方の注意書き「all page elements and the canvas itself are set to transparent」。
    → ★AR 中だけ html と body の下地を 透かす。UI（ヘッダーやパネル）は そのまま。 */
 html.arx, body.arx{background:transparent !important}
+/* ★S78 AR 中の 入れ物。ただの箱（位置は 子の position:fixed のまま） */
+#arov{background:transparent}
 body.arx #cv{background:transparent !important}
 /* ★S30 重ね順。#vid を z-index:-1 にすると body の背景（--bg）に隠れて
    カメラ映像が出ない（負の z-index は body の背景より先に描かれるため）。
@@ -319,7 +321,8 @@ input[type=range]{width:100%}
 <div id="arui">
   <div class="row"><span class="k" style="width:5em">基準の杭</span><select id="anchor" style="flex:1;padding:6px"></select></div>
   <div class="row"><button class="btn g" id="bPlace" style="flex:1">① 足元に合わせる</button>
-                  <button class="btn" id="bHeading" style="flex:1">② 向きを合わせる</button></div>
+                  <button class="btn" id="bHeading" style="flex:1">② 向きを合わせる</button>
+                  <button class="btn" id="bAREnd" style="width:5em">終了</button></div>
   <div class="row"><span class="k" style="width:4em">回転</span><input type="range" id="arRot" min="-180" max="180" value="0" step="0.5"><span class="mono k" id="arRotV" style="width:4em;text-align:right">0°</span></div>
   <div class="row"><span class="k" style="width:4em">高さ</span><input type="range" id="arZ" min="-300" max="300" value="0"><span class="mono k" id="arZV" style="width:4em;text-align:right">0.00</span></div>
   <div class="tiny" id="arTip">床を映して輪郭が出たら「① 足元に合わせる」を押してください。</div>

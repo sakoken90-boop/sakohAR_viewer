@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v37';  // ★S77 AR に入ったら まず目の前に仮置き＋床が無くても合わせられる
+const V = 'sd-viewer-v38';  // ★S78 重ね表示の root を #arui に＋画面タップは XR の select で拾う
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
