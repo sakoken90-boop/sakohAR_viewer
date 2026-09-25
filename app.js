@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 38;
+const APP_V = 40;
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -342,6 +342,7 @@ async function init() {
   });
   renderer.setAnimationLoop(tick);
   initAR();
+  arLogPeek();                       // ★S79 前回 AR の中で 何が起きたかを 見せる
   // ★S66→S73 Variant のビューアの中で開き直されたときは そのまま AR に入る
   //   ★xr は まだ無い。SDK を読んでから 生えるのを待つ（最大 10 秒）
   try {
@@ -531,6 +532,11 @@ function bindUI() {
   };
   // ★S66 Variant Launch（iOS の鋲基準 AR）の設定
   if ($('cVL')) {
+    const cOv = $('cArOv');                    // ★S80 重ね表示を 使うか
+    if (cOv) {
+      cOv.checked = arOvOn();
+      cOv.onchange = () => { try { localStorage.setItem(AROV, cOv.checked ? '1' : '0'); } catch (e) {} };
+    }
     $('cVL').checked = vlOn();
     $('vlKey').value = vlKey();
     const vlNote = () => {
@@ -988,6 +994,17 @@ function arApply() {
 //   ★セッションに入った後の DOM の書き換えが 画面に出ないことがある。
 //   実際 S75 で入れた「①カメラの起動…」の表示も ★一度も出なかった。
 //   → ★入る前に AR の見た目にしてしまう。しくじったら 戻す。
+// ★S80 ★重ね表示（dom-overlay）を 使うかどうか。
+//   Variant のビューアの中では ★既定で 使わない にした。
+//   「root 以外を隠す」まね事のせいで ★3D の画まで 隠れている疑いが濃いため。
+//   使わなければ 画面の UI は 出ないが、★画面タップ（XR の select）で 操作できる。
+//   Android では 従来どおり 使う（本物の dom-overlay なので 問題ない）。
+const AROV = 'sd_arov';
+const arOvOn = () => {
+  try { const v = localStorage.getItem(AROV); if (v !== null) return v === '1'; } catch (e) {}
+  return !isVlx();                     // ★Variant の中では 既定 オフ
+};
+
 // ★S78 重ね表示の 入れ物。
 //   Variant の dom-overlay は「★root 以外を隠す」まね事なので、
 //   ★3D の画（canvas）と AR用UI を ★ひとつの箱に入れて、その箱を root にする。
@@ -1009,7 +1026,7 @@ function arOverlay(on) {
 
 function arSkin(on) {
   try {
-    arOverlay(on);                       // ★S78 先に 箱に入れる／出す
+    if (arOvOn()) arOverlay(on); else arOverlay(false);   // ★S80 使うときだけ 箱に入れる
     document.documentElement.classList.toggle('arx', on);
     document.body.classList.toggle('arx', on);
     try { renderer.setClearAlpha(on ? 0 : 1); } catch (e) {}
@@ -1028,10 +1045,30 @@ function arSkin(on) {
 }
 // ★S76 AR 中は 画面に出せないので 段階を ためておき、終わってから 見せる
 let arLog = [];
+// ★S79 AR 中は お知らせ（alert）も 出ないことがある。
+//   → ★端末に 書き置きして、★次に ふつうの画面を開いたときに 見せる。
+//   これで「AR の中で 何が起きたか」が ★必ず 手に入る。
+const ARLOG = 'sd_arlog';
+function arLogSave(head) {
+  try { localStorage.setItem(ARLOG, JSON.stringify({ t: Date.now(), head, l: arLog })); } catch (e) {}
+}
 function arLogShow(head) {
+  arLogSave(head);                       // ★まず 書き置き（これは 必ず残る）
   const t = arLog.join('\n');
   arLog = [];
-  if (t) alert(head + '\n\n' + t);
+  if (t) { try { alert(head + '\n\n' + t); } catch (e) {} }
+}
+// ★起動時に 書き置きがあれば 見せて 消す
+function arLogPeek() {
+  try {
+    const raw = localStorage.getItem(ARLOG); if (!raw) return;
+    localStorage.removeItem(ARLOG);
+    const o = JSON.parse(raw);
+    if (!o || !o.l || !o.l.length) return;
+    const min = Math.round((Date.now() - (o.t || 0)) / 60000);
+    setTimeout(() => alert('★前回の AR の記録（' + min + ' 分前）\n' + (o.head || '') + '\n\n'
+      + o.l.join('\n')), 900);
+  } catch (e) {}
 }
 
 async function startAR() {
@@ -1049,28 +1086,37 @@ async function startAR() {
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
   try {
-    step('①カメラの起動');
-    const session = await withTimeout(navigator.xr.requestSession('immersive-ar', {
-      requiredFeatures: vlx ? ['hit-test', 'dom-overlay'] : ['hit-test'],
-      optionalFeatures: vlx ? [] : ['dom-overlay'],
-      // ★S78 root を ★body から #arui に変えた。
-      //   Variant は「root 以外を隠す」まね事なので、body を渡すと
-      //   ★body の子（ヘッダー・AR用UI）が まるごと隠れていたとみられる。
-      //   先方も「フレームワークが触らない 専用の箱」を root に、と書いている。
-      domOverlay: { root: document.getElementById('arov') || document.body },
-    }), 20000, '①カメラの起動');
+    const useOv = arOvOn();
+    step('①カメラの起動' + (useOv ? '（重ね表示 あり）' : '（重ね表示 ★なし）'));
+    const opt = { requiredFeatures: ['hit-test'], optionalFeatures: [] };
+    if (useOv) {
+      opt.optionalFeatures.push('dom-overlay');
+      opt.domOverlay = { root: document.getElementById('arov') || document.body };
+    }
+    const session = await withTimeout(navigator.xr.requestSession('immersive-ar', opt),
+      20000, '①カメラの起動');
     xrSession = session;
+
+    // ★S80 ここが 効いていなかった疑いが 濃い。
+    //   three.js は setSession の中で ★自分で requestReferenceSpace を呼ぶ。
+    //   その既定が ★'local-floor'。Variant が これを持っていないと
+    //   ★setSession が こけて 3D が いっさい 描かれない。
+    //   → ★先に 使える型を 調べて、★three にも 同じ型を使わせる。
+    step('③基準の空間（先に調べる）');
+    refSpace = null; let rsType = null;
+    for (const t of ['local', 'local-floor', 'viewer']) {
+      try {
+        refSpace = await withTimeout(session.requestReferenceSpace(t), 8000, '③基準の空間（' + t + '）');
+        rsType = t; step('　→ ★' + t + ' が使える'); break;
+      } catch (e) { step('　→ ' + t + ' は駄目'); }
+    }
+    if (!refSpace) throw new Error('★基準の空間が どれも取れませんでした。');
+    try { renderer.xr.setReferenceSpaceType(rsType); step('　→ three にも ★' + rsType + ' を使わせた'); }
+    catch (e) { step('　→ ★型の指定に失敗：' + ((e && e.message) || e)); }
 
     step('②描画の引き渡し');
     await withTimeout(renderer.xr.setSession(session), 10000, '②描画の引き渡し');
-
-    step('③基準の空間');
-    refSpace = null;
-    for (const t of ['local', 'local-floor', 'viewer']) {
-      try { refSpace = await withTimeout(session.requestReferenceSpace(t), 8000, '③基準の空間（' + t + '）'); step('　→ ' + t + ' が取れた'); break; }
-      catch (e) { step('　→ ' + t + ' は駄目'); }
-    }
-    if (!refSpace) throw new Error('★基準の空間が どれも取れませんでした。');
+    step('　→ 引き渡し ★済み（isPresenting=' + (renderer.xr.isPresenting ? 'はい' : '★いいえ') + '）');
 
     step('④床の検出');
     try {
@@ -1086,6 +1132,7 @@ async function startAR() {
     if (!anchorW) { anchorW = new THREE.Vector3(0, -1.2, -3); arProv = true; arApply(); }
 
     step('⑤できあがり');
+    arLogSave('★AR に入った所までの 記録');      // ★S79 ここで いったん 書き置き
     $('arTip').textContent = hitSource
       ? '床を映して輪郭が出たら「① 足元に合わせる」を押してください。'
       : '★床の検出が使えませんでした。画面の中央が 足元に来るように構えて「① 足元に合わせる」を押してください。';
