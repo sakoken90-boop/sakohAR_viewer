@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 33;
+const APP_V = 34;
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -109,6 +109,14 @@ function vlLoad() {
 function isVlx() {
   try { return new URLSearchParams(location.search).get('vlxr') === '1'; }
   catch (e) { return false; }
+}
+// ★S74 返ってこない約束に 時間を切る（黙って止まるのを 無くす）
+function withTimeout(p, ms, label) {
+  return Promise.race([
+    Promise.resolve(p),
+    new Promise((_, rj) => setTimeout(
+      () => rj(new Error('★' + label + 'が ' + (ms / 1000) + ' 秒 返ってきませんでした。')), ms)),
+  ]);
 }
 function waitXR(ms) {
   return new Promise((res) => {
@@ -326,7 +334,15 @@ async function init() {
     if (isVlx()) {
       hud('現地 AR の準備をしています…（10 秒ほど）');
       vlPrepXR(10000).then((ok) => {
-        if (ok) { hud('現地 AR を開きます…'); setTimeout(() => { const b = $('bAR'); if (b) b.click(); }, 500); }
+        // ★S74 ここで 自動で押していたのが 間違いだった。
+        //   WebXR の immersive セッションは ★人が押した操作からしか 始められない
+        //   （user activation が要る）。setTimeout の中の click には それが無く、
+        //   requestSession が ★返ってこないまま 止まっていた。
+        //   → ★押してもらう。ボタンを目立たせて 案内するだけにする
+        if (ok) {
+          hud('★準備ができました。上の <b>「AR（実寸）」</b>を押してください。');
+          const b = $('bAR'); if (b) { b.classList.add('on'); b.textContent = '▶ AR（実寸）'; }
+        }
         else hud('★この画面では WebXR が見つかりませんでした。「AR」を押すと Quick Look で開きます。');
       });
     }
@@ -886,10 +902,19 @@ function initAR() {
     }
     if (xrSession) { xrSession.end(); return; }
     if (!navigator.xr) { alert('この端末／ブラウザは現地 AR に未対応です。\niPhone/iPad は Safari で開いてください（AR Quick Look を使います）。\nAndroid は Chrome でお使いください。'); return; }
-    if (!await navigator.xr.isSessionSupported('immersive-ar')) {
+    // ★S74 返ってこないまま 止まることがあるので ★時間を切る。
+    //   黙って止まるのが いちばん困る。必ず 何か出す
+    let sup;
+    try { sup = await withTimeout(navigator.xr.isSessionSupported('immersive-ar'), 6000, '対応の問い合わせ'); }
+    catch (e) { hud(''); alert('現地 AR を始められません。\n' + e.message); return; }
+    if (!sup) {
       alert('この端末では現地 AR（immersive-ar）が使えません。\nAndroid では「Google Play開発者サービス（AR）」の更新で使えるようになることがあります。'); return;
     }
-    try { await startAR(); } catch (e) { alert('AR を開始できません：' + e); }
+    hud('AR を開始しています…');
+    $('bAR').textContent = '開始中…';
+    try { await withTimeout(startAR(), 25000, 'AR の開始'); }
+    catch (e) { hud(''); $('bAR').textContent = quickLook ? 'AR（実寸）' : 'AR';
+      alert('AR を開始できません。\n' + ((e && e.message) || e)); }
   };
   $('anchor').onchange = () => { if (anchorW) arApply(); };
   $('arRot').oninput = () => { heading = headingBase + THREE.MathUtils.degToRad(+$('arRot').value); $('arRotV').textContent = (+$('arRot').value).toFixed(1) + '°'; arApply(); };
@@ -951,6 +976,7 @@ async function startAR() {
 
   scene.background = null; controls.enabled = false; zoomUI(false);   // ★S58
   $('sheet').classList.remove('open'); $('bPanel').classList.remove('on');
+  hud('');                                                   // ★S74 案内を消す
   $('arui').classList.add('show'); $('bAR').textContent = 'AR終了'; $('bAR').classList.add('on');
   stakeGrp.visible = false;
   $('arTip').textContent = '床を映して輪郭が出たら「① 足元に合わせる」を押してください。';
@@ -960,7 +986,8 @@ async function startAR() {
     scene.background = new THREE.Color(0xf4f5f3); controls.enabled = true; zoomUI(true);   // ★S58
     arRoot.position.set(0, 0, 0); arRoot.quaternion.identity();
     anchorW = null; heading = 0; headingBase = 0; zOff = 0;
-    $('arui').classList.remove('show'); $('bAR').textContent = 'AR'; $('bAR').classList.remove('on');
+    $('arui').classList.remove('show'); $('bAR').classList.remove('on');
+    $('bAR').textContent = isQuickLook() ? 'AR（実寸）' : 'AR';   // ★S74 iOS では 実寸と出す
     stakeGrp.visible = $('cStakes').checked;
     $('arRot').value = 0; $('arZ').value = 0;
   });
