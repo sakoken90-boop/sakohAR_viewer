@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 31;
+const APP_V = 32;
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -82,20 +82,34 @@ function vlLoad() {
     // ★読み込めなかった：通信が切れている／キーが違う／ドメインが弾かれた
     sc.onerror = () => fin({ ok: false,
       why: 'SDK を読み込めませんでした。通信 または SDK キーを確かめてください。' });
-    // ★読み込めた：生えるまで 0.1 秒ごとに見る（知らせを取りこぼしたとき用）
-    sc.onload = () => {
-      let n = 0;
-      const t = setInterval(() => {
-        if (ready()) { clearInterval(t); fin({ ok: true, why: '' }); }
-        else if (++n > 80 || done) { clearInterval(t); }
-      }, 100);
-    };
     document.head.appendChild(sc);
-    // ★総あきらめ（下のコメントは 8 秒の意味）
-    setTimeout(() => fin({ ok: false,
-      why: 'SDK が初期化されませんでした。\n'
-         + 'launchar.app の管理画面で ドメイン\n  sakoken90-boop.github.io\n'
-         + 'が登録されているか 確かめてください（★省略なしの全部）。' }), 8000);
+    // ★S72 ここが S71 の間違い。
+    //   以前は「window.VLaunch が生えたら すぐ ok」にしていたが、
+    //   ★VLaunch は 知らせ（vlaunch-initialized）より 先に生える。
+    //   その時点の getLaunchUrl は ★まだ中身が揃っておらず 呼ぶと止まる。
+    //   現場のお知らせ「知らせ なし／getLaunchUrl あり」が まさにこれ。
+    //   → ★知らせを 最優先で待つ。来なかったときだけ ダメ元で VLaunch を使う
+    setTimeout(() => {
+      if (ready()) fin({ ok: true, why: '', late: true });   // ★知らせは来なかったが 物はある
+      else fin({ ok: false,
+        why: 'SDK が初期化されませんでした。\n'
+           + 'launchar.app の管理画面で ドメイン\n  sakoken90-boop.github.io\n'
+           + 'が登録されているか 確かめてください（★省略なしの全部）。' });
+    }, 8000);
+  });
+}
+
+// ★S72 飛び先が作れるまで 粘る（初期化が遅れているだけのことがある）
+//   知らせが後から来れば vlState が埋まるので、そこで ②が使えるようになる
+function vlTry(ms) {
+  return new Promise((res) => {
+    const t0 = Date.now();
+    const step = () => {
+      const g = vlUrl(vlState);
+      if (g.url || Date.now() - t0 > ms) return res(g);
+      setTimeout(step, 400);
+    };
+    step();
   });
 }
 
@@ -803,15 +817,18 @@ function initAR() {
             $('arq').click(); return;
           }
           // ★S71 飛び先は 3通りある。1つ目で止まっても 次を試す
-          const g = vlUrl(d);
-          if (g.url) { vlNote(g, d); location.href = g.url; return; }
+          // ★S72 まだ初期化の途中のことがあるので 最大 6 秒 粘る
+          $('bAR').textContent = '準備中…（飛び先）';
+          const g = await vlTry(6000);
+          $('bAR').textContent = 'AR（実寸）';
+          if (g.url) { vlNote(g, vlState || d); location.href = g.url; return; }
           why = g.err
             ? '飛び先を作るときに止まりました：' + g.err
             : '飛び先（launchUrl）が どの道でも作れませんでした。';
         }
         alert('Variant Launch を開始できませんでした。\n'
             + (why ? '\n' + why + '\n' : '')
-            + '\n状態：' + vlDesc(d)
+            + '\n状態：' + vlDesc(vlState || d)
             + '\n\nこのまま Quick Look で開きます。');
       }
       $('arq').click(); return;                       // iOS：Quick Look で 1:1 配置
