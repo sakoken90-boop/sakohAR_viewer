@@ -15,6 +15,12 @@
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
   font:14px/1.5 system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif}
+/* ★S75 iOS（Variant のビューア）では カメラ映像が ★ブラウザの背後 に描かれる。
+   ページが不透明だと そこで隠れてしまう（＝真っ白のまま）。
+   先方の注意書き「all page elements and the canvas itself are set to transparent」。
+   → ★AR 中だけ html と body の下地を 透かす。UI（ヘッダーやパネル）は そのまま。 */
+html.arx, body.arx{background:transparent !important}
+body.arx #cv{background:transparent !important}
 /* ★S30 重ね順。#vid を z-index:-1 にすると body の背景（--bg）に隠れて
    カメラ映像が出ない（負の z-index は body の背景より先に描かれるため）。
    映像 0 ／ 3D 1 にして、その上に UI（8〜20）が乗る。 */

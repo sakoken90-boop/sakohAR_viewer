@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v34';  // ★S74 AR は人が押す＋止まらないよう時間を切った
+const V = 'sd-viewer-v35';  // ★S75 AR 中は下地を透かす（iOS はカメラが背後）＋進み具合を出す
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

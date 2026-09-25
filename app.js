@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 34;
+const APP_V = 35;
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -920,7 +920,19 @@ function initAR() {
   $('arRot').oninput = () => { heading = headingBase + THREE.MathUtils.degToRad(+$('arRot').value); $('arRotV').textContent = (+$('arRot').value).toFixed(1) + '°'; arApply(); };
   $('arZ').oninput = () => { zOff = +$('arZ').value / 100; $('arZV').textContent = zOff.toFixed(2); arApply(); };
   $('bPlace').onclick = () => {
-    if (!reticle.visible) { $('arTip').textContent = '床が認識できていません。少しゆっくり動かして輪郭を出してください。'; return; }
+    if (!reticle.visible) {
+      // ★S75 床の検出そのものが使えないときだけ、カメラの 1.5 m 前・1.2 m 下 を仮に使う
+      if (!hitSource) {
+        const p = new THREE.Vector3(), d = new THREE.Vector3();
+        camera.getWorldPosition(p); camera.getWorldDirection(d);
+        d.y = 0; if (d.lengthSq() < 1e-6) d.set(0, 0, -1); d.normalize();
+        anchorW = p.clone().addScaledVector(d, 1.5); anchorW.y = p.y - 1.2;
+        arApply();
+        $('arTip').textContent = '★床が使えないので 仮に置きました（精度は落ちます）。次に「② 向きを合わせる」を押してください。';
+        return;
+      }
+      $('arTip').textContent = '床が認識できていません。少しゆっくり動かして輪郭を出してください。'; return;
+    }
     anchorW = new THREE.Vector3().setFromMatrixPosition(reticle.matrix);
     arApply();
     $('arTip').textContent = '置きました。次に、堤防の上流側の地面（できれば別の鋲）に向けて「② 向きを合わせる」を押してください。';
@@ -963,25 +975,49 @@ async function startAR() {
   const vlx = (() => { try {
     return new URLSearchParams(location.search).get('vlxr') === '1';
   } catch (e) { return false; } })();
-  const session = await navigator.xr.requestSession('immersive-ar', {
+  // ★S75 どこまで進んだかを 画面に残す（止まった所が 分かるように）
+  const step = (s) => hud('AR を開始しています…　' + s);
+  step('①カメラの起動');
+  const session = await withTimeout(navigator.xr.requestSession('immersive-ar', {
     requiredFeatures: vlx ? ['hit-test', 'dom-overlay'] : ['hit-test'],
     optionalFeatures: vlx ? [] : ['dom-overlay'],
     domOverlay: { root: document.body },
-  });
+  }), 20000, '①カメラの起動');
   xrSession = session;
-  await renderer.xr.setSession(session);
-  refSpace = await session.requestReferenceSpace('local');
-  const viewer = await session.requestReferenceSpace('viewer');
-  hitSource = await session.requestHitTestSource({ space: viewer });
+  step('②描画の引き渡し');
+  await withTimeout(renderer.xr.setSession(session), 10000, '②描画の引き渡し');
+  step('③基準の空間');
+  // ★S75 local が無い作りもあるので 順に試す
+  refSpace = null;
+  for (const t of ['local', 'local-floor', 'viewer']) {
+    try { refSpace = await withTimeout(session.requestReferenceSpace(t), 8000, '③基準の空間（' + t + '）'); break; }
+    catch (e) { /* 次を試す */ }
+  }
+  if (!refSpace) throw new Error('★基準の空間（local）が取れませんでした。');
+  step('④床の検出');
+  // ★S75 床の検出が使えなくても AR そのものには入れるようにする
+  try {
+    const viewer = await withTimeout(session.requestReferenceSpace('viewer'), 8000, '④基準（viewer）');
+    hitSource = await withTimeout(session.requestHitTestSource({ space: viewer }), 10000, '④床の検出');
+  } catch (e) { hitSource = null; }
 
+  // ★S75 iOS では カメラ映像が ブラウザの背後。ページを 透かさないと 真っ白のまま
+  document.documentElement.classList.add('arx');
+  document.body.classList.add('arx');
+  try { renderer.setClearAlpha(0); } catch (e) {}
   scene.background = null; controls.enabled = false; zoomUI(false);   // ★S58
   $('sheet').classList.remove('open'); $('bPanel').classList.remove('on');
   hud('');                                                   // ★S74 案内を消す
   $('arui').classList.add('show'); $('bAR').textContent = 'AR終了'; $('bAR').classList.add('on');
   stakeGrp.visible = false;
-  $('arTip').textContent = '床を映して輪郭が出たら「① 足元に合わせる」を押してください。';
+  $('arTip').textContent = hitSource
+    ? '床を映して輪郭が出たら「① 足元に合わせる」を押してください。'
+    : '★床の検出が使えませんでした。画面の中央が 足元に来るように構えて「① 足元に合わせる」を押してください。';
 
   session.addEventListener('end', () => {
+    document.documentElement.classList.remove('arx');   // ★S75 下地を戻す
+    document.body.classList.remove('arx');
+    try { renderer.setClearAlpha(1); } catch (e) {}
     xrSession = null; hitSource = null; reticle.visible = false;
     scene.background = new THREE.Color(0xf4f5f3); controls.enabled = true; zoomUI(true);   // ★S58
     arRoot.position.set(0, 0, 0); arRoot.quaternion.identity();
