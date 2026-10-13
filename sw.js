@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v42';  // ★S83 ②を「向ける先の杭」で解く（どの2点でも合う）＋AR1〜6 を法肩へ
+const V = 'sd-viewer-v43';  // ★S84 AR3・AR5 の実測標高を入れた（コードは v42 と同じ）
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
