@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 41;
+const APP_V = 42;
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -322,7 +322,7 @@ async function init() {
   dom.addEventListener('pointerdown', () => {
     if (!xrSession) return;
     const now = Date.now();
-    if (now - arTapT < 450) { arTapT = 0; $('bHeading').click(); return; }
+    if (now - arTapT < 450) { arAimT = arTapT; arTapT = 0; $('bHeading').click(); return; }
     arTapT = now;
     setTimeout(() => {
       if (arTapT && Date.now() - arTapT >= 450) { arTapT = 0; $('bPlace').click(); }
@@ -851,8 +851,56 @@ function setAnchor(v) {
     if ([].some.call(el.options, o => o.value === v)) el.value = v;
   }
   try { localStorage.setItem(ANC, v); } catch (e) {}
+  // ★S83 立つ杭と 向ける先が 同じになったら 向ける先を 選び直す
+  try { const t = $('anchorT'); if (t && t.options.length && t.value === v) setTarget(autoTarget(v)); } catch (e) {}
   try { if (anchorGrp) redrawAnchors(); } catch (e) {}     // ★選んだ杭を 緑にする
   if (anchorW) arApply();
+}
+
+// ★S83 ②で 向ける先の杭。
+//   S82 までの ②は「いま向いている方向 ＝ 立っている杭の所での 堤防の接線」としていた。
+//   これは ★直線区間でしか 合わない（AR1→AR2 は 円弧 R=600 の上で 約 1.9° ずれる）。
+//   しかも 向きは「①の点 → 端末の 5 m 先」で取っていたので、
+//   ★端末が 杭の真上から 横に外れたぶんが そのまま 向きの誤差になっていた。
+//   → ★向ける先の杭を 選んでおき、「端末が いま その杭を 見ている」として 向きを解く。
+//     どの2点でも合う／杭が遠いほど 精度が上がる／端末が 杭の真上に無くてよい。
+const ANCT = 'sd_anchor_t';
+const TNONE = '-';                       // 選ばない ＝ 旧来の「堤防の向き」で合わせる
+function ptOf(v) {
+  if (!v || v === TNONE) return null;
+  return (v[0] === 'a' ? anchorZ()[+v.slice(1)] : M.stakes[+v.slice(1)]) || null;
+}
+function arTarget() {
+  const el = $('anchorT'); const v = el ? el.value : '';
+  return (v && v !== $('anchor').value) ? ptOf(v) : null;
+}
+function curTargetName() {
+  try {
+    const v = $('anchorT').value;
+    if (v && v[0] === 'a' && v !== $('anchor').value) return ((M.anchors || [])[+v.slice(1)] || {}).name || null;
+  } catch (e) {}
+  return null;
+}
+// 既定の 向ける先：30 m 以上 離れた鋲のうち 近いもの（上流側・同じ離れ を 少し優先）
+function autoTarget(v) {
+  const k = ptOf(v); if (!k) return TNONE;
+  let b = TNONE, bs = Infinity;
+  (M.anchors || []).forEach((a, i) => {
+    if ('a' + i === v) return;
+    const d = Math.hypot(a.x - k.x, a.y - k.y);
+    if (d < 30) return;
+    const s = d + (a.ds < k.ds ? 5 : 0) + (Math.abs((a.off || 0) - Math.abs(k.off || 0)) > 0.01 ? 5 : 0);
+    if (s < bs) { bs = s; b = 'a' + i; }
+  });
+  return b;
+}
+function setTarget(v) {
+  for (const id of ['anchorT', 'anchorT2']) {
+    const el = $(id); if (!el) continue;
+    if ([].some.call(el.options, o => o.value === v)) el.value = v;
+  }
+  try { localStorage.setItem(ANCT, v); } catch (e) {}
+  try { if (anchorGrp) redrawAnchors(); } catch (e) {}     // ★向ける先を 青にする
 }
 
 function initAR() {
@@ -881,6 +929,29 @@ function initAR() {
   const onSel = (e) => setAnchor(e.target.value);
   $('anchor').onchange = onSel;
   if ($('anchor2')) $('anchor2').onchange = onSel;
+
+  // ★S83 向ける先の杭（②で使う）。★値（'a3' など）で持つ。並び順では持たない（S82 の教訓）
+  for (const id of ['anchorT', 'anchorT2']) {
+    const el = $(id); if (!el) continue;
+    const o = document.createElement('option');
+    o.value = TNONE; o.textContent = '選ばない（堤防の向きで合わせる・直線区間のみ）';
+    el.appendChild(o);
+    fill(el);
+    el.onchange = (e) => setTarget(e.target.value);
+  }
+  let t0 = null;
+  try { t0 = localStorage.getItem(ANCT); } catch (e) {}
+  if (!t0 || t0 === $('anchor').value || (t0 !== TNONE && !ptOf(t0))) t0 = autoTarget($('anchor').value);
+  setTarget(t0);
+
+  // ★S83 狙いの印（画面の真ん中）。iPhone では 重ね表示を切っているので 3D で出す。
+  //   端末の 真正面 1 m に 毎コマ 置く。これを 向ける先の杭に 重ねて 2回たたく
+  aim = new THREE.Group();
+  const am = new THREE.MeshBasicMaterial({ color: 0xe61ea0, depthTest: false, side: THREE.DoubleSide });
+  aim.add(new THREE.Mesh(new THREE.RingGeometry(0.0100, 0.0125, 32), am));
+  aim.add(new THREE.Mesh(new THREE.CircleGeometry(0.0020, 12), am));
+  aim.children.forEach(c => { c.renderOrder = 999; });
+  aim.visible = false; scene.add(aim);
 
   const ring = new THREE.RingGeometry(0.10, 0.14, 32).rotateX(-Math.PI / 2);
   reticle = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: 0x2f6f4e }));
@@ -981,12 +1052,39 @@ function initAR() {
     else t = provPoint(1.5);
     if (!t) { $('arTip').textContent = 'まだ場所が定まりません。少し動かしてから もう一度 押してください。'; return; }
     anchorW = t; arProv = false; arApply();
+    const kk = arPoint(), tn = curTargetName();
+    arNote('①足元　立つ杭 ' + (kk.name || kk.sv_no) + (reticle.visible ? '　床の輪郭の所に置いた' : '　★床が拾えず 目分量（前 1.5 m・1.2 m 下）'));
+    const nx = tn ? '次に、真ん中の印を ★' + tn + '（青い柱の杭）に重ねて' : '次に、堤防の上流側に向けて';
     $('arTip').textContent = reticle.visible
-      ? '置きました。次に、堤防の上流側の地面（できれば別の鋲）に向けて「② 向きを合わせる」を押してください。'
-      : '★床が使えないので 足元を 目分量で置きました（精度は落ちます）。次に「② 向きを合わせる」を押してください。';
+      ? '置きました。' + nx + '「② 向きを合わせる」を押してください。'
+      : '★床が使えないので 足元を 目分量で置きました（精度は落ちます）。' + nx + '「② 向きを合わせる」を押してください。';
   };
   $('bHeading').onclick = () => {
     if (!anchorW) { $('arTip').textContent = '先に「① 足元に合わせる」を押してください。'; return; }
+    // ★S83 向ける先の杭が 選んであれば「端末が いま その杭を 見ている」として解く
+    const T = arTarget();
+    if (T) {
+      const tm = arAimT || Date.now(); arAimT = 0;
+      if (arProv) { arNote('②向き ★①がまだ（仮置きのまま）なので 何もしていない'); $('arTip').textContent = '先に「① 足元に合わせる」を押してください。'; return; }
+      const s = aimSample(tm);
+      if (!s) { $('arTip').textContent = 'まだ向きが定まりません。少し動かしてから もう一度 押してください。'; return; }
+      const k = arPoint();
+      const r = solveHeading(k, T, anchorW, s);
+      if (!r) {
+        arNote('②向き ★解けない（立つ杭 ' + (k.name || k.sv_no) + ' → 向ける先 ' + (T.name || T.sv_no) + '）');
+        $('arTip').textContent = '向きが解けませんでした。立つ杭の近くで、向ける先の杭に 印を重ねて もう一度。'; return;
+      }
+      headingBase = r.h;
+      $('arRot').value = 0; $('arRotV').textContent = '0.0°';
+      heading = headingBase; arApply();
+      arNote('②向き　立つ杭 ' + (k.name || k.sv_no) + ' → 向ける先 ' + (T.name || T.sv_no)
+        + '　杭の間 ' + r.L.toFixed(2) + ' m　端末は 立つ杭から ' + r.off.toFixed(2) + ' m'
+        + '　使った向き ' + s.n + ' コマの平均');
+      $('arTip').textContent = '向きを合わせました（' + (T.name || T.sv_no) + ' まで ' + r.L.toFixed(1) + ' m）。'
+        + '青い柱が その杭に 乗っているか 見てください。';
+      return;
+    }
+    arAimT = 0;
     // ★S77 床が無ければ ★いま向いている方向の 5 m 先 を狙った所とみなす
     const tgt = reticle.visible
       ? new THREE.Vector3().setFromMatrixPosition(reticle.matrix)
@@ -1002,6 +1100,53 @@ function initAR() {
     heading = headingBase; arApply();
     $('arTip').textContent = '向きを合わせました。ずれていれば「回転」「高さ」で微調整してください。';
   };
+}
+
+// ★S83 ②の中身。立つ杭 k・向ける先 T（モデル座標 東,北）、①で置いた点 aW、
+//   端末の位置と 水平の向き s（AR の空間）から、モデルを回す角を出す。
+//   条件：回したあとの「向ける先」が、端末から 向いている方向へ のばした線の上に来ること。
+//     aW + R(h)·v = P + t·f   （v＝立つ杭→向ける先、P＝端末、f＝向き、t>0）
+//   → 線の上で aW から 杭の間の距離 L だけ 離れた点（遠い方）を取り、v を そこへ向ける。
+//   世界は (東, 標高, −北)。Y まわりに h 回すと atan2(x, z) が h 増える
+function solveHeading(k, T, aW, s) {
+  const vx = T.x - k.x, vz = -(T.y - k.y);
+  const L = Math.hypot(vx, vz);
+  if (!(L > 2)) return null;
+  const ax = aW.x - s.px, az = aW.z - s.pz;            // 端末 → 立つ杭
+  const af = ax * s.fx + az * s.fz;
+  const disc = L * L - (ax * ax + az * az) + af * af;
+  if (disc < 0) return null;                           // 端末が 杭の間より 遠くに外れている
+  const t = af + Math.sqrt(disc);
+  if (!(t > 0)) return null;
+  const wx = t * s.fx - ax, wz = t * s.fz - az;
+  return { h: Math.atan2(wx, wz) - Math.atan2(vx, vz), L, off: Math.hypot(ax, az) };
+}
+
+// ★S83 たたく時の 手ぶれを 避ける。
+//   端末の 位置と向きを 2 秒ぶん ためておき、★たたく直前（0.7〜0.15 秒前）の平均を使う。
+//   たたいた瞬間の 1 コマは 端末が 揺れているので 使わない
+let aim = null, arAimT = 0;
+const aimHist = [];
+function aimPush(p, f) {
+  const t = Date.now();
+  aimHist.push({ t, px: p.x, pz: p.z, fx: f.x, fz: f.z });
+  while (aimHist.length && t - aimHist[0].t > 2000) aimHist.shift();
+}
+function aimSample(tm) {
+  let n = 0, px = 0, pz = 0, fx = 0, fz = 0;
+  for (const h of aimHist) {
+    if (h.t < tm - 700 || h.t > tm - 150) continue;
+    n++; px += h.px; pz += h.pz; fx += h.fx; fz += h.fz;
+  }
+  const len = Math.hypot(fx, fz);
+  if (n && len > 1e-6) return { n, px: px / n, pz: pz / n, fx: fx / len, fz: fz / len };
+  if (!viewerPos || !viewerFwd) return null;           // ためが無ければ いまの 1 コマ
+  return { n: 1, px: viewerPos.x, pz: viewerPos.z, fx: viewerFwd.x, fz: viewerFwd.z };
+}
+// AR 中の できごとを 記録に足して すぐ 書き置きする（AR 中は 画面に出せないため）
+function arNote(s) {
+  arLog.push(new Date().toLocaleTimeString() + '　' + s);
+  arLogSave('★AR の記録（途中まで）');
 }
 
 function nearestAxis(sd) {
@@ -1176,6 +1321,7 @@ async function startAR() {
     session.addEventListener('select', () => {
       const now = Date.now();
       if (now - selT < 600) {
+        arAimT = selT;                                  // ★S83 1回目に たたいた時刻（その直前の向きを使う）
         selT = 0; if (selTimer) { clearTimeout(selTimer); selTimer = null; }
         try { $('bHeading').click(); } catch (e) {}
         return;
@@ -1189,6 +1335,7 @@ async function startAR() {
       arSkin(false);                                  // ★S76 見た目を 戻す
       xrSession = null; hitSource = null; reticle.visible = false;
       viewerPos = null; viewerFwd = null; arProv = false;   // ★S77
+      if (aim) aim.visible = false; aimHist.length = 0; arAimT = 0;   // ★S83
       arRoot.position.set(0, 0, 0); arRoot.quaternion.identity();
       anchorW = null; heading = 0; headingBase = 0; zOff = 0;
       $('arRot').value = 0; $('arZ').value = 0;
@@ -1224,6 +1371,11 @@ function arFrame(frame) {
     const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
     f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize();
     viewerFwd = (viewerFwd || new THREE.Vector3()).copy(f);
+    aimPush(viewerPos, viewerFwd);                      // ★S83 ②のために ためておく
+    if (aim) {                                          // ★S83 狙いの印を 真正面 1 m に
+      aim.visible = true; aim.quaternion.copy(q);
+      aim.position.copy(viewerPos).add(new THREE.Vector3(0, 0, -1).applyQuaternion(q));
+    }
     // ★S77 まだ合わせていない間は 前方 3 m に ★仮置き して ★とにかく見えるようにする
     //   （これが無いと AR に入った直後 モデルが どこにあるか 分からない）
     if (!anchorW) {
@@ -1272,9 +1424,10 @@ function redrawAnchors() {
     if (fitSkip && a.name === fitSkip) continue;   // ★カメラがこの中に入るので隠す
     // ★S82 いま選んでいる杭だけ ★緑で 太く（どれで合わせるのか 一目で分かるように）
     const on = (a.name === curAnchorName());
-    const h = on ? 2.6 : 2.0, rr = on ? 0.06 : 0.035;
+    const tg = !on && (a.name === curTargetName());   // ★S83 ②で 向ける先は ★青
+    const h = on ? 2.6 : tg ? 2.3 : 2.0, rr = (on || tg) ? 0.06 : 0.035;
     const g = new THREE.CylinderGeometry(rr, rr, h, 8).rotateX(Math.PI / 2).translate(a.x, a.y, a.z + h / 2);
-    anchorGrp.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: on ? 0x16a34a : 0xd23b2f })));
+    anchorGrp.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: on ? 0x16a34a : tg ? 0x2563eb : 0xd23b2f })));
     if (on) {                                   // ★足元に 緑の輪
       const rg = new THREE.RingGeometry(0.30, 0.42, 36).translate(a.x, a.y, a.z + 0.01);
       anchorGrp.add(new THREE.Mesh(rg, new THREE.MeshBasicMaterial({

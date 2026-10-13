@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v41';  // ★S82 基準の杭を AR 前に選べる＋既定を AR1 に直した
+const V = 'sd-viewer-v42';  // ★S83 ②を「向ける先の杭」で解く（どの2点でも合う）＋AR1〜6 を法肩へ
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
