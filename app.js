@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 43;   // ★v43 は データだけの入れ替え（AR3・AR5 の実測標高）。端末の控えを 確実に 入れ替えるため 版を上げた
+const APP_V = 44;   // ★S85 選んだ杭を App Clip へ 持って行く
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -164,6 +164,14 @@ function vlUrl(detail) {
   try {
     if (window.VLaunch && window.VLaunch.getLaunchUrl) {
       const u = new URL(location.href); u.searchParams.set('vlxr', '1');
+      // ★S85 選んだ杭を 飛び先に 持たせる。
+      //   App Clip の中は Safari とは ★別の入れ物 で、端末の控え（localStorage）が 引き継がれない。
+      //   Safari で AR3 を選んでも 開き直した先では 既定の AR1 に 戻っていた
+      try {
+        const a = $('anchor'), t = $('anchorT');
+        if (a && a.value) u.searchParams.set('anc', a.value);
+        if (t && t.value) u.searchParams.set('anct', t.value);
+      } catch (e) {}
       const lu = VLaunch.getLaunchUrl(u.toString());
       if (lu) { out.url = lu; out.how = '①'; return out; }
     }
@@ -355,7 +363,10 @@ async function init() {
         //   requestSession が ★返ってこないまま 止まっていた。
         //   → ★押してもらう。ボタンを目立たせて 案内するだけにする
         if (ok) {
-          hud('★準備ができました。上の <b>「AR（実寸）」</b>を押してください。');
+          // ★S85 どの杭で合わせるのかを ここで 見せる（違っていたら「表示」で 選び直せる）
+          hud('★準備ができました。<b>' + selText() + '</b>　で合わせます。'
+            + '違っていたら「表示」→「AR（実寸）の 基準の杭」で 選び直してから、'
+            + '上の <b>「AR（実寸）」</b>を押してください。');
           const b = $('bAR'); if (b) { b.classList.add('on'); b.textContent = '▶ AR（実寸）'; }
         }
         else hud('★この画面では WebXR が見つかりませんでした。「AR」を押すと Quick Look で開きます。');
@@ -866,6 +877,24 @@ function setAnchor(v) {
 //     どの2点でも合う／杭が遠いほど 精度が上がる／端末が 杭の真上に無くてよい。
 const ANCT = 'sd_anchor_t';
 const TNONE = '-';                       // 選ばない ＝ 旧来の「堤防の向き」で合わせる
+// ★S85 App Clip へ 飛ぶ時に 付けた杭（?vlxr=1&anc=a2&anct=a4）。App Clip の中でだけ 読む
+function urlSel() {
+  const o = { a: null, t: null };
+  try {
+    if (!isVlx()) return o;
+    const q = new URLSearchParams(location.search), ok = (v) => /^[as]\d{1,3}$/.test(v || '');
+    if (ok(q.get('anc'))) o.a = q.get('anc');
+    if (ok(q.get('anct')) || q.get('anct') === TNONE) o.t = q.get('anct');
+  } catch (e) {}
+  return o;
+}
+// いま選んでいる組を 言葉で（AR に入る前の 確かめ用）
+function selText() {
+  try {
+    const k = arPoint(), T = arTarget();
+    return '立つ杭 ' + (k.name || k.sv_no) + ' → 向ける先 ' + (T ? (T.name || T.sv_no) : '選ばない');
+  } catch (e) { return ''; }
+}
 function ptOf(v) {
   if (!v || v === TNONE) return null;
   return (v[0] === 'a' ? anchorZ()[+v.slice(1)] : M.stakes[+v.slice(1)]) || null;
@@ -925,6 +954,10 @@ function initAR() {
   //   → ★既定は AR1。前に選んだものが あれば それを 覚えておく
   let v0 = 'a0';
   try { const sv = localStorage.getItem(ANC); if (sv) v0 = sv; } catch (e) {}
+  // ★S85 App Clip で 開き直した時は 飛び先に 付けてきた杭を 最優先（Safari で選んだもの）
+  const qs = urlSel();
+  if (qs.a) v0 = qs.a;
+  if (!ptOf(v0)) v0 = 'a0';
   setAnchor(v0);
   const onSel = (e) => setAnchor(e.target.value);
   $('anchor').onchange = onSel;
@@ -941,6 +974,7 @@ function initAR() {
   }
   let t0 = null;
   try { t0 = localStorage.getItem(ANCT); } catch (e) {}
+  if (qs.t) t0 = qs.t;                                   // ★S85 飛び先に 付けてきたもの
   if (!t0 || t0 === $('anchor').value || (t0 !== TNONE && !ptOf(t0))) t0 = autoTarget($('anchor').value);
   setTarget(t0);
 
@@ -1257,7 +1291,7 @@ async function startAR() {
     hud('AR を開始しています…　' + s);          // ★出れば出るで よい
   };
 
-  step('⓪画面を AR 用にする');
+  step('⓪画面を AR 用にする　★' + selText());
   arSkin(true);
   // ★描き直しを 2 コマ待ってから 入る（切り替えを 確実に 間に合わせる）
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
