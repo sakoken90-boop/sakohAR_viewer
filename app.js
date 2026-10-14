@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 44;   // ★S85 選んだ杭を App Clip へ 持って行く
+const APP_V = 45;   // ★S86 ②まで モデルを隠す／②は たたいた後 1.5 秒 取り込む／透過・部品も App Clip へ
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -172,6 +172,7 @@ function vlUrl(detail) {
         if (a && a.value) u.searchParams.set('anc', a.value);
         if (t && t.value) u.searchParams.set('anct', t.value);
       } catch (e) {}
+      try { viewToUrl(u); } catch (e) {}               // ★S86 透過と 部品の表示も 持って行く
       const lu = VLaunch.getLaunchUrl(u.toString());
       if (lu) { out.url = lu; out.how = '①'; return out; }
     }
@@ -365,6 +366,7 @@ async function init() {
         if (ok) {
           // ★S85 どの杭で合わせるのかを ここで 見せる（違っていたら「表示」で 選び直せる）
           hud('★準備ができました。<b>' + selText() + '</b>　で合わせます。'
+            + (viewCarried ? '（透過・部品の表示も Safari の設定を 引き継ぎました）' : '')
             + '違っていたら「表示」→「AR（実寸）の 基準の杭」で 選び直してから、'
             + '上の <b>「AR（実寸）」</b>を押してください。');
           const b = $('bAR'); if (b) { b.classList.add('on'); b.textContent = '▶ AR（実寸）'; }
@@ -888,6 +890,45 @@ function urlSel() {
   } catch (e) {}
   return o;
 }
+// ★S86 透過と 部品の表示も App Clip へ 持って行く（S85 と同じ理由。Safari の設定は 届かない）
+//   ops／opt ＝ 透過（完成形の面／構造物）0〜100
+//   vis ＝ 部品ごとの 表示（Object.keys(meshes) の順の 0/1 を 16進に）＋ "." ＋ 部品の数
+//     部品の数が 合わなければ 使わない（データの版が 違う時の 取り違え防止）
+let viewCarried = '';
+function viewToUrl(u) {
+  u.searchParams.set('ops', String($('opSurf').value));
+  u.searchParams.set('opt', String($('opStr').value));
+  const ns = Object.keys(meshes);
+  let bits = ns.map(n => meshes[n].visible ? '1' : '0').join('');
+  let hex = '';
+  while (bits.length % 4) bits += '0';
+  for (let i = 0; i < bits.length; i += 4) hex += parseInt(bits.slice(i, i + 4), 2).toString(16);
+  u.searchParams.set('vis', hex + '.' + ns.length);
+}
+function viewFromUrl() {
+  if (!isVlx()) return '';
+  const q = new URLSearchParams(location.search), done = [];
+  const setOp = (id, v) => {
+    if (!/^\d{1,3}$/.test(v || '') || +v > 100) return;
+    const sl = $(id); sl.value = v; sl.dispatchEvent(new Event('input')); done.push(id + '=' + v);
+  };
+  setOp('opSurf', q.get('ops')); setOp('opStr', q.get('opt'));
+  const vis = q.get('vis') || '', m = vis.match(/^([0-9a-f]+)\.(\d+)$/);
+  const ns = Object.keys(meshes);
+  if (m && +m[2] === ns.length) {
+    const bits = [...m[1]].map(h => parseInt(h, 16).toString(2).padStart(4, '0')).join('');
+    const boxes = document.querySelectorAll('#parts input');
+    ns.forEach((n, i) => { meshes[n].visible = bits[i] === '1'; });
+    // 一覧の チェックも そろえる（一覧は 名前で 並べ替えて 出しているので 名前で 引く）
+    boxes.forEach(b => {
+      const nm = b.closest('label') && b.closest('label').textContent.trim();
+      if (nm && meshes[nm]) b.checked = meshes[nm].visible;
+    });
+    done.push('部品 ' + ns.filter(n => meshes[n].visible).length + '/' + ns.length);
+  }
+  return done.join('　');
+}
+
 // いま選んでいる組を 言葉で（AR に入る前の 確かめ用）
 function selText() {
   try {
@@ -975,6 +1016,7 @@ function initAR() {
   let t0 = null;
   try { t0 = localStorage.getItem(ANCT); } catch (e) {}
   if (qs.t) t0 = qs.t;                                   // ★S85 飛び先に 付けてきたもの
+  try { viewCarried = viewFromUrl(); } catch (e) {}      // ★S86 透過と 部品の表示
   if (!t0 || t0 === $('anchor').value || (t0 !== TNONE && !ptOf(t0))) t0 = autoTarget($('anchor').value);
   setTarget(t0);
 
@@ -1098,24 +1140,37 @@ function initAR() {
     // ★S83 向ける先の杭が 選んであれば「端末が いま その杭を 見ている」として解く
     const T = arTarget();
     if (T) {
-      const tm = arAimT || Date.now(); arAimT = 0;
+      const t1 = arAimT, t2 = Date.now(); arAimT = 0;
+      if (aimBusy) return;                               // ★S86 取り込み中の たたきは 無視
       if (arProv) { arNote('②向き ★①がまだ（仮置きのまま）なので 何もしていない'); $('arTip').textContent = '先に「① 足元に合わせる」を押してください。'; return; }
-      const s = aimSample(tm);
-      if (!s) { $('arTip').textContent = 'まだ向きが定まりません。少し動かしてから もう一度 押してください。'; return; }
-      const k = arPoint();
-      const r = solveHeading(k, T, anchorW, s);
-      if (!r) {
-        arNote('②向き ★解けない（立つ杭 ' + (k.name || k.sv_no) + ' → 向ける先 ' + (T.name || T.sv_no) + '）');
-        $('arTip').textContent = '向きが解けませんでした。立つ杭の近くで、向ける先の杭に 印を重ねて もう一度。'; return;
-      }
-      headingBase = r.h;
-      $('arRot').value = 0; $('arRotV').textContent = '0.0°';
-      heading = headingBase; arApply();
-      arNote('②向き　立つ杭 ' + (k.name || k.sv_no) + ' → 向ける先 ' + (T.name || T.sv_no)
-        + '　杭の間 ' + r.L.toFixed(2) + ' m　端末は 立つ杭から ' + r.off.toFixed(2) + ' m'
-        + '　使った向き ' + s.n + ' コマの平均');
-      $('arTip').textContent = '向きを合わせました（' + (T.name || T.sv_no) + ' まで ' + r.L.toFixed(1) + ' m）。'
-        + '青い柱が その杭に 乗っているか 見てください。';
+      // ★S86 手ぶれ対策。2回たたいた ★あと 1.5 秒 構えたままにしてもらい、
+      //   たたく前（0.8〜0.15 秒前）と たたいた後（0.25〜1.75 秒後）の 向きを 平均する。
+      //   たたいた瞬間の 揺れは 使わない。取り込み中は 印が ★黄色 になる
+      const r1 = t1 ? [t1 - 800, t1 - 150] : [t2 - 800, t2 - 150];
+      const r2 = [t2 + 250, t2 + 1750];
+      aimBusy = true; aimColor(0xf5c400);
+      $('arTip').textContent = '★そのまま 1.5 秒 構えていてください（印が黄色の間）。';
+      setTimeout(() => {
+        aimBusy = false; aimColor(0xe61ea0);
+        if (!xrSession || !anchorW) return;
+        const s = aimSampleW([r1, r2]);
+        if (!s) { $('arTip').textContent = 'まだ向きが定まりません。少し動かしてから もう一度 押してください。'; return; }
+        const k = arPoint();
+        const r = solveHeading(k, T, anchorW, s);
+        if (!r) {
+          arNote('②向き ★解けない（立つ杭 ' + (k.name || k.sv_no) + ' → 向ける先 ' + (T.name || T.sv_no) + '）');
+          $('arTip').textContent = '向きが解けませんでした。立つ杭の近くで、向ける先の杭に 印を重ねて もう一度。'; return;
+        }
+        headingBase = r.h;
+        $('arRot').value = 0; $('arRotV').textContent = '0.0°';
+        heading = headingBase; arSet = true; arApply();
+        arNote('②向き　立つ杭 ' + (k.name || k.sv_no) + ' → 向ける先 ' + (T.name || T.sv_no)
+          + '　杭の間 ' + r.L.toFixed(2) + ' m　端末は 立つ杭から ' + r.off.toFixed(2) + ' m'
+          + '　使った向き ' + s.n + ' コマの平均（手のぶれ ±' + s.sd.toFixed(2) + '°。'
+          + '平均しているので 結果の誤差は これより ずっと小さい）');
+        $('arTip').textContent = '向きを合わせました（' + (T.name || T.sv_no) + ' まで ' + r.L.toFixed(1) + ' m）。'
+          + '青い柱が その杭に 乗っているか 見てください。';
+      }, 1800);
       return;
     }
     arAimT = 0;
@@ -1131,7 +1186,7 @@ function initAR() {
     const tl = new THREE.Vector3(Math.sin(a[3]), 0, -Math.cos(a[3]));   // 上流向き（世界系の向きに直す前）
     headingBase = Math.atan2(d.x, d.z) - Math.atan2(tl.x, tl.z);
     $('arRot').value = 0; $('arRotV').textContent = '0.0°';
-    heading = headingBase; arApply();
+    heading = headingBase; arSet = true; arApply();
     $('arTip').textContent = '向きを合わせました。ずれていれば「回転」「高さ」で微調整してください。';
   };
 }
@@ -1159,23 +1214,31 @@ function solveHeading(k, T, aW, s) {
 // ★S83 たたく時の 手ぶれを 避ける。
 //   端末の 位置と向きを 2 秒ぶん ためておき、★たたく直前（0.7〜0.15 秒前）の平均を使う。
 //   たたいた瞬間の 1 コマは 端末が 揺れているので 使わない
-let aim = null, arAimT = 0;
+// ★S86 2回たたいた後も 1.5 秒 取り込むので、ためは 4 秒ぶん
+let aim = null, arAimT = 0, aimBusy = false;
 const aimHist = [];
 function aimPush(p, f) {
   const t = Date.now();
   aimHist.push({ t, px: p.x, pz: p.z, fx: f.x, fz: f.z });
-  while (aimHist.length && t - aimHist[0].t > 2000) aimHist.shift();
+  while (aimHist.length && t - aimHist[0].t > 4000) aimHist.shift();
 }
-function aimSample(tm) {
-  let n = 0, px = 0, pz = 0, fx = 0, fz = 0;
-  for (const h of aimHist) {
-    if (h.t < tm - 700 || h.t > tm - 150) continue;
-    n++; px += h.px; pz += h.pz; fx += h.fx; fz += h.fz;
-  }
+function aimColor(c) {
+  try { if (aim) aim.children.forEach(m => m.material.color.setHex(c)); } catch (e) {}
+}
+// rs = [[開始, 終わり], …]（時刻 ms）の 中の コマを 平均する。sd は 向きの ばらつき（度）
+function aimSampleW(rs) {
+  const use = aimHist.filter(h => rs.some(r => h.t >= r[0] && h.t <= r[1]));
+  let n = use.length, px = 0, pz = 0, fx = 0, fz = 0;
+  for (const h of use) { px += h.px; pz += h.pz; fx += h.fx; fz += h.fz; }
   const len = Math.hypot(fx, fz);
-  if (n && len > 1e-6) return { n, px: px / n, pz: pz / n, fx: fx / len, fz: fz / len };
+  if (n && len > 1e-6) {
+    const mx = fx / len, mz = fz / len;
+    let ss = 0;
+    for (const h of use) { const d = Math.atan2(h.fx * mz - h.fz * mx, h.fx * mx + h.fz * mz); ss += d * d; }
+    return { n, px: px / n, pz: pz / n, fx: mx, fz: mz, sd: Math.sqrt(ss / n) * 180 / Math.PI };
+  }
   if (!viewerPos || !viewerFwd) return null;           // ためが無ければ いまの 1 コマ
-  return { n: 1, px: viewerPos.x, pz: viewerPos.z, fx: viewerFwd.x, fz: viewerFwd.z };
+  return { n: 1, px: viewerPos.x, pz: viewerPos.z, fx: viewerFwd.x, fz: viewerFwd.z, sd: 0 };
 }
 // AR 中の できごとを 記録に足して すぐ 書き置きする（AR 中は 画面に出せないため）
 function arNote(s) {
@@ -1241,13 +1304,14 @@ function arSkin(on) {
     document.documentElement.classList.toggle('arx', on);
     document.body.classList.toggle('arx', on);
     try { renderer.setClearAlpha(on ? 0 : 1); } catch (e) {}
+    if (!on && zup) zup.visible = true;                 // ★S86 しくじって 戻る時も 必ず 出す
     scene.background = on ? null : new THREE.Color(0xf4f5f3);
     controls.enabled = !on; zoomUI(!on);
     if (on) { $('sheet').classList.remove('open'); $('bPanel').classList.remove('on'); }
     $('arui').classList.toggle('show', on);
     // ★AR 中は 書き換えが 画面に出ないことがあるので 案内も ★先に入れておく
-    if (on) $('arTip').textContent = '★モデルは まず 目の前 3 m に 仮置きしています。'
-      + '基準の杭の所に立って、足元を映しながら「① 足元に合わせる」を押してください。';
+    if (on) $('arTip').textContent = '★モデルは ②が済むまで 出しません（杭が 見えるように）。'
+      + '立つ杭の頭に 緑の輪を合わせて「① 足元に合わせる」を押してください。';
     $('bAR').textContent = on ? 'AR終了' : (isQuickLook() ? 'AR（実寸）' : 'AR');
     $('bAR').classList.toggle('on', on);
     stakeGrp.visible = on ? false : $('cStakes').checked;
@@ -1291,7 +1355,8 @@ async function startAR() {
     hud('AR を開始しています…　' + s);          // ★出れば出るで よい
   };
 
-  step('⓪画面を AR 用にする　★' + selText());
+  step('⓪画面を AR 用にする　★' + selText()
+    + '　透過 面' + $('opSurf').value + '／構造物' + $('opStr').value);
   arSkin(true);
   // ★描き直しを 2 コマ待ってから 入る（切り替えを 確実に 間に合わせる）
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -1307,6 +1372,11 @@ async function startAR() {
     const session = await withTimeout(navigator.xr.requestSession('immersive-ar', opt),
       20000, '①カメラの起動');
     xrSession = session;
+    // ★S86 ②が済むまで モデルは 出さない。
+    //   現場で「①の時に モデルが 杭を隠して 見えない」「杭頭に 超接写したら モデルが消えて 見えた」。
+    //   ②の前は 向きが 決まっていないので、出していても 位置は 合っていない。
+    //   入った直後も 桃色の印は 出るので「動いているか 分からない」（S77）には ならない
+    arSet = false; if (zup) zup.visible = false;
 
     // ★S80 ここが 効いていなかった疑いが 濃い。
     //   three.js は setSession の中で ★自分で requestReferenceSpace を呼ぶ。
@@ -1370,6 +1440,7 @@ async function startAR() {
       xrSession = null; hitSource = null; reticle.visible = false;
       viewerPos = null; viewerFwd = null; arProv = false;   // ★S77
       if (aim) aim.visible = false; aimHist.length = 0; arAimT = 0;   // ★S83
+      arSet = false; aimBusy = false; aimColor(0xe61ea0); if (zup) zup.visible = true;   // ★S86 ふつうの画面では 出す
       arRoot.position.set(0, 0, 0); arRoot.quaternion.identity();
       anchorW = null; heading = 0; headingBase = 0; zOff = 0;
       $('arRot').value = 0; $('arZ').value = 0;
@@ -1386,6 +1457,7 @@ async function startAR() {
 
 // ★S77 端末（カメラ）の いまの位置と 向き。AR に入った直後の ★仮置き に使う
 let viewerPos = null, viewerFwd = null, arProv = false;
+let arSet = false;                // ★S86 ②が済んだか（済むまで モデルを 出さない）
 // ★仮に置く場所　前方 d m ・ 1.2 m 下（＝だいたい 足元）
 function provPoint(d) {
   if (!viewerPos || !viewerFwd) return null;
@@ -1396,6 +1468,7 @@ function provPoint(d) {
 
 function arFrame(frame) {
   if (!refSpace) return;
+  if (zup) zup.visible = arSet;                         // ★S86 ②が済むまで モデルは 出さない
   // ★S77 端末の位置・向きを 毎コマ 取っておく（床の検出が使えなくても これは取れる）
   const vp = frame.getViewerPose(refSpace);
   if (vp) {

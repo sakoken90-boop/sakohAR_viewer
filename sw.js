@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v44';  // ★S85 選んだ杭を App Clip へ 持って行く（Safari とは 控えが 別だった）
+const V = 'sd-viewer-v45';  // ★S86 ②まで モデルを隠す／②の手ぶれ対策／透過・部品も App Clip へ
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
