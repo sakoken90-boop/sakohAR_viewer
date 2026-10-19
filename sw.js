@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v46';  // ★S89 AR2〜AR5 の実測標高を入れた（コードは v45 と同じ）
+const V = 'sd-viewer-v47';  // ★S90 合わせ終わったら ロック。3回たたきで 解除
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

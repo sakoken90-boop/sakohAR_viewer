@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 46;   // ★S89 データだけの入れ替え（AR2〜AR5 の実測標高）。コードは v45 と同じ
+const APP_V = 47;   // ★S90 合わせ終わったら ロック（スクショの時に 触っても 動かない）。3回たたきで 解除
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -330,6 +330,7 @@ async function init() {
   let arTapT = 0;
   dom.addEventListener('pointerdown', () => {
     if (!xrSession) return;
+    if (!arTapGate()) return;                          // ★S90 合わせ終わったら ロック
     const now = Date.now();
     if (now - arTapT < 450) { arAimT = arTapT; arTapT = 0; $('bHeading').click(); return; }
     arTapT = now;
@@ -1164,12 +1165,14 @@ function initAR() {
         headingBase = r.h;
         $('arRot').value = 0; $('arRotV').textContent = '0.0°';
         heading = headingBase; arSet = true; arApply();
+        arLocked = true; lockTaps.length = 0;           // ★S90 合わせ終わったら ロック
         arNote('②向き　立つ杭 ' + (k.name || k.sv_no) + ' → 向ける先 ' + (T.name || T.sv_no)
           + '　杭の間 ' + r.L.toFixed(2) + ' m　端末は 立つ杭から ' + r.off.toFixed(2) + ' m'
           + '　使った向き ' + s.n + ' コマの平均（手のぶれ ±' + s.sd.toFixed(2) + '°。'
           + '平均しているので 結果の誤差は これより ずっと小さい）');
         $('arTip').textContent = '向きを合わせました（' + (T.name || T.sv_no) + ' まで ' + r.L.toFixed(1) + ' m）。'
-          + '青い柱が その杭に 乗っているか 見てください。';
+          + '青い柱が その杭に 乗っているか 見てください。★ロックしました（画面に触れても 動きません。'
+          + '合わせ直すときは 3回 続けて たたく）';
       }, 1800);
       return;
     }
@@ -1187,7 +1190,9 @@ function initAR() {
     headingBase = Math.atan2(d.x, d.z) - Math.atan2(tl.x, tl.z);
     $('arRot').value = 0; $('arRotV').textContent = '0.0°';
     heading = headingBase; arSet = true; arApply();
-    $('arTip').textContent = '向きを合わせました。ずれていれば「回転」「高さ」で微調整してください。';
+    arLocked = true; lockTaps.length = 0;               // ★S90
+    $('arTip').textContent = '向きを合わせました。ずれていれば「回転」「高さ」で微調整してください。'
+      + '★ロックしました（合わせ直すときは 3回 続けて たたく）';
   };
 }
 
@@ -1423,6 +1428,7 @@ async function startAR() {
     //   ★1回 → ①足元に合わせる ／ ★2回（0.6 秒以内）→ ②向きを合わせる
     let selT = 0, selTimer = null;
     session.addEventListener('select', () => {
+      if (!arTapGate()) return;                        // ★S90 合わせ終わったら ロック
       const now = Date.now();
       if (now - selT < 600) {
         arAimT = selT;                                  // ★S83 1回目に たたいた時刻（その直前の向きを使う）
@@ -1441,6 +1447,7 @@ async function startAR() {
       viewerPos = null; viewerFwd = null; arProv = false;   // ★S77
       if (aim) aim.visible = false; aimHist.length = 0; arAimT = 0;   // ★S83
       arSet = false; aimBusy = false; aimColor(0xe61ea0); if (zup) zup.visible = true;   // ★S86 ふつうの画面では 出す
+      arLocked = false; lockTaps.length = 0;           // ★S90
       arRoot.position.set(0, 0, 0); arRoot.quaternion.identity();
       anchorW = null; heading = 0; headingBase = 0; zOff = 0;
       $('arRot').value = 0; $('arZ').value = 0;
@@ -1458,6 +1465,29 @@ async function startAR() {
 // ★S77 端末（カメラ）の いまの位置と 向き。AR に入った直後の ★仮置き に使う
 let viewerPos = null, viewerFwd = null, arProv = false;
 let arSet = false;                // ★S86 ②が済んだか（済むまで モデルを 出さない）
+
+// ★S90 合わせ終わったら ロックする。
+//   現場で「スクショを撮ると 確認のために 画面を触る必要があり、それが ①（1回たたき）に
+//   拾われて モデルが動いてしまう」。
+//   → ②が済んだら ★画面に触れても 何もしない。★3回 素早く 続けて（各 0.4 秒以内）たたくと 外れる。
+//     ロック中は 桃色の印も 消す（スクショに 写らない）
+let arLocked = false;
+const lockTaps = [];
+function arTapGate() {                     // true ＝ ふつうに ①② として扱う
+  if (!arLocked) return true;
+  const now = Date.now();
+  // 1回の タッチが pointerdown と select の 両方で 来る端末が あるので、近すぎる 2つは 1つに数える
+  if (lockTaps.length && now - lockTaps[lockTaps.length - 1] < 120) return false;
+  // ★前の たたきから 0.4 秒を 超えたら 数え直し（ゆっくり 触っただけでは 外れない）
+  if (lockTaps.length && now - lockTaps[lockTaps.length - 1] > 400) lockTaps.length = 0;
+  lockTaps.push(now);
+  if (lockTaps.length >= 3) {
+    lockTaps.length = 0; arLocked = false;
+    arNote('ロックを外した（3回たたき）');
+    $('arTip').textContent = 'ロックを外しました。1回たたく＝①足元／2回＝②向き で 合わせ直せます。';
+  }
+  return false;
+}
 // ★仮に置く場所　前方 d m ・ 1.2 m 下（＝だいたい 足元）
 function provPoint(d) {
   if (!viewerPos || !viewerFwd) return null;
@@ -1480,7 +1510,7 @@ function arFrame(frame) {
     viewerFwd = (viewerFwd || new THREE.Vector3()).copy(f);
     aimPush(viewerPos, viewerFwd);                      // ★S83 ②のために ためておく
     if (aim) {                                          // ★S83 狙いの印を 真正面 1 m に
-      aim.visible = true; aim.quaternion.copy(q);
+      aim.visible = !arLocked; aim.quaternion.copy(q);   // ★S90 ロック中は 印を 出さない
       aim.position.copy(viewerPos).add(new THREE.Vector3(0, 0, -1).applyQuaternion(q));
     }
     // ★S77 まだ合わせていない間は 前方 3 m に ★仮置き して ★とにかく見えるようにする
