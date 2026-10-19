@@ -13,7 +13,8 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 49;   // ★S92 法肩の NO 位置（橙の柱）を出す
+let kataGrp;                      // ★S93 設計NO 法肩杭（橙の柱）。現況NO杭（stakeGrp）とは 別に 切り替える
+const APP_V = 50;   // ★S93 現況NO杭と 設計NO法肩杭の 表示を 別々に 切り替え
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -498,11 +499,13 @@ function label(text, sub) {
 
 function buildStakes() {
   stakeGrp = new THREE.Group(); root.add(stakeGrp);
+  kataGrp = new THREE.Group(); root.add(kataGrp);
   drawStakes();
 }
 // ★S91 AR 中は 小さな札（測点名だけ）を 低い所に。ふつうの画面は これまでどおり
 function drawStakes() {
   while (stakeGrp.children.length) stakeGrp.remove(stakeGrp.children[0]);
+  while (kataGrp.children.length) kataGrp.remove(kataGrp.children[0]);
   for (const k of M.stakes) {
     const z0 = k.z || 5;
     const nm = k.sv_no.replace('+00.000', '').replace(/\+0?/, '+');
@@ -518,16 +521,16 @@ function drawStakes() {
   for (const p of katamataPts()) {
     const h = arLbl ? 0.8 : 1.5;
     const g = new THREE.CylinderGeometry(0.025, 0.025, h, 8).rotateX(Math.PI / 2).translate(p.x, p.y, p.z + h / 2);
-    stakeGrp.add(new THREE.Mesh(g, mo));
+    kataGrp.add(new THREE.Mesh(g, mo));
     for (const rot of [0, Math.PI / 2]) {                 // 足元の 十字（腕 ±0.3 m）
       const b = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.03, 0.01), mo);
       b.position.set(p.x, p.y, p.z + 0.006); b.rotation.z = -nearestAxis(p.ds)[3] + rot;
-      stakeGrp.add(b);
+      kataGrp.add(b);
     }
     const sp = arLbl ? labelSmall(p.name + ' 法肩', '#f08c00') : label(p.name + ' 法肩', '計画堤防高 ' + p.z.toFixed(3));
     if (arLbl) sp.position.set(p.x, p.y, p.z + h + AR_LH / 2 + 0.08);
     else { sp.position.set(p.x, p.y, p.z + h + 1.0); sp.scale.set(5, 1.9, 1); }
-    stakeGrp.add(sp);
+    kataGrp.add(sp);
   }
 }
 
@@ -603,6 +606,8 @@ function bindUI() {
   updateSlice();
 
   $('cStakes').onchange = e => { stakeGrp.visible = e.target.checked; };
+  // ★S93 古い index.html が 端末に残っていても 止まらないように（欄が無ければ 何もしない）
+  if ($('cKata')) $('cKata').onchange = e => { kataGrp.visible = e.target.checked; };
   $('cAxis').onchange = e => { axisLine.visible = e.target.checked; };
   $('cAnchor').onchange = e => { anchorsOn = e.target.checked; anchorGrp.visible = anchorsOn; };
 
@@ -974,6 +979,8 @@ function viewToUrl(u) {
   while (bits.length % 4) bits += '0';
   for (let i = 0; i < bits.length; i += 4) hex += parseInt(bits.slice(i, i + 4), 2).toString(16);
   u.searchParams.set('vis', hex + '.' + ns.length);
+  // ★S93 杭の 表示（現況NO杭／設計NO法肩杭／AR基準点）も 持って行く
+  u.searchParams.set('pin', ['cStakes', 'cKata', 'cAnchor'].map(id => ($(id) && $(id).checked) ? '1' : '0').join(''));
 }
 function viewFromUrl() {
   if (!isVlx()) return '';
@@ -995,6 +1002,14 @@ function viewFromUrl() {
       if (nm && meshes[nm]) b.checked = meshes[nm].visible;
     });
     done.push('部品 ' + ns.filter(n => meshes[n].visible).length + '/' + ns.length);
+  }
+  const pin = q.get('pin') || '';                       // ★S93 杭の 表示
+  if (/^[01]{3}$/.test(pin)) {
+    ['cStakes', 'cKata', 'cAnchor'].forEach((id, i) => {
+      const el = $(id); if (!el) return;
+      el.checked = pin[i] === '1'; el.dispatchEvent(new Event('change'));
+    });
+    done.push('杭 ' + pin);
   }
   return done.join('　');
 }
@@ -1392,6 +1407,7 @@ function arSkin(on) {
     arLbl = on;
     try { drawStakes(); redrawAnchors(); } catch (e) {}
     stakeGrp.visible = $('cStakes').checked;
+    kataGrp.visible = $('cKata') ? $('cKata').checked : true;   // ★S93
     hud('');
   } catch (e) {}
 }

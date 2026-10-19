@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v49';  // ★S92 法肩の NO 位置（橙の柱）を出す
+const V = 'sd-viewer-v50';  // ★S93 現況NO杭と 設計NO法肩杭の 表示を 別々に
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
