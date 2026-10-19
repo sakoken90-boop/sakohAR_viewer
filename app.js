@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 45;   // ★S86 ②まで モデルを隠す／②は たたいた後 1.5 秒 取り込む／透過・部品も App Clip へ
+const APP_V = 46;   // ★S89 データだけの入れ替え（AR2〜AR5 の実測標高）。コードは v45 と同じ
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
