@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 48;   // ★S91 AR 中の標識を 小さく（名前だけ）／AR 中も NO 杭を出す
+const APP_V = 49;   // ★S92 法肩の NO 位置（橙の柱）を出す
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -438,11 +438,14 @@ function buildAxis() {
 //   幅 1.6 m × 高さ 0.48 m（実寸）。ふつうの 3D 画面の 札（幅 6〜9 m）とは 別に作る
 let arLbl = false;                 // AR 中か（標識の 作り分けに使う）
 const AR_LW = 1.6, AR_LH = 0.48;
-function labelSmall(text) {
-  const cv = document.createElement('canvas'), s = 2, W = 160, H = 48;
+function labelSmall(text, edge) {
+  const s = 2, H = 48;
+  const m = document.createElement('canvas').getContext('2d'); m.font = 'bold 28px system-ui';
+  const W = Math.max(160, Math.ceil(m.measureText(text).width) + 28);   // ★文字が長ければ 札を 広げる
+  const cv = document.createElement('canvas');
   cv.width = W * s; cv.height = H * s;
   const x = cv.getContext('2d'); x.scale(s, s);
-  x.fillStyle = 'rgba(255,255,255,.85)'; x.strokeStyle = '#1b3a5c'; x.lineWidth = 2;
+  x.fillStyle = 'rgba(255,255,255,.85)'; x.strokeStyle = edge || '#1b3a5c'; x.lineWidth = edge ? 3 : 2;
   x.beginPath();
   if (x.roundRect) x.roundRect(2, 2, W - 4, H - 4, 8); else x.rect(2, 2, W - 4, H - 4);
   x.fill(); x.stroke();
@@ -450,7 +453,31 @@ function labelSmall(text) {
   x.fillText(text, W / 2, H / 2 + 1);
   const t = new THREE.CanvasTexture(cv); t.anisotropy = 4;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
-  sp.scale.set(AR_LW, AR_LH, 1); return sp;
+  sp.scale.set(AR_LH * W / H, AR_LH, 1); return sp;
+}
+
+// ★S92 法肩（川表・離れ 9.100）の NO 位置。段階確認の 法線確認用（S88 の K 点と 同じ位置）
+//   位置 ＝ 測点の 設計追加距離（横断方向角の交点＝横断図の 設計NO.）で、設計中心線に 直角に 左岸側へ 9.100。
+//   設計線形（M.axis・0.5 m 毎）を 追加距離で 補間して 出す。
+//   ★追加距離は 上流へ 増えるので 進行方向の 右手が 左岸：(東,北) ＋ (cos, −sin)×9.100
+const KATA_OFF = 9.100;
+function katamataPts() {
+  const ax = M.axis, out = [];
+  for (const k of M.stakes) {
+    const ds = k.ds;
+    if (ds < M.range.lo - 1e-6 || ds > M.range.hi + 1e-6) continue;
+    // 対照表には NO 以外の行（土工の始終点・護岸の始終点）もある。護岸の始終点は AR1・AR6 と同じ所なので 出さない
+    if (/^(土工|護岸)(始|終)点$/.test(k.name || '')) continue;
+    let a = null, b = null;
+    for (let i = 0; i + 1 < ax.length; i++) if (ax[i][0] <= ds && ds <= ax[i + 1][0]) { a = ax[i]; b = ax[i + 1]; break; }
+    if (!a) continue;
+    const t = (ds - a[0]) / ((b[0] - a[0]) || 1);
+    const e = a[1] + (b[1] - a[1]) * t, n = a[2] + (b[2] - a[2]) * t;
+    const tn = a[3] + (b[3] - a[3]) * t, z = a[5] + (b[5] - a[5]) * t;   // 計画堤防高（法肩）
+    out.push({ name: k.name || k.sv_no.replace('+00.000', '').replace(/\+0?/, '+'), ds,   // IP14・BC.15 は 点名で
+               x: e + Math.cos(tn) * KATA_OFF, y: n - Math.sin(tn) * KATA_OFF, z });
+  }
+  return out;
 }
 
 function label(text, sub) {
@@ -485,6 +512,22 @@ function drawStakes() {
     const g = new THREE.BufferGeometry().setFromPoints(
       [new THREE.Vector3(k.x, k.y, z0), new THREE.Vector3(k.x, k.y, top)]);
     stakeGrp.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x2b6cb0 })));
+  }
+  // ★S92 法肩の NO 位置（橙の 細い柱 ＋ 足元の 十字 ＋ 札「NO.96 法肩」）
+  const orange = 0xf08c00, mo = new THREE.MeshBasicMaterial({ color: orange });
+  for (const p of katamataPts()) {
+    const h = arLbl ? 0.8 : 1.5;
+    const g = new THREE.CylinderGeometry(0.025, 0.025, h, 8).rotateX(Math.PI / 2).translate(p.x, p.y, p.z + h / 2);
+    stakeGrp.add(new THREE.Mesh(g, mo));
+    for (const rot of [0, Math.PI / 2]) {                 // 足元の 十字（腕 ±0.3 m）
+      const b = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.03, 0.01), mo);
+      b.position.set(p.x, p.y, p.z + 0.006); b.rotation.z = -nearestAxis(p.ds)[3] + rot;
+      stakeGrp.add(b);
+    }
+    const sp = arLbl ? labelSmall(p.name + ' 法肩', '#f08c00') : label(p.name + ' 法肩', '計画堤防高 ' + p.z.toFixed(3));
+    if (arLbl) sp.position.set(p.x, p.y, p.z + h + AR_LH / 2 + 0.08);
+    else { sp.position.set(p.x, p.y, p.z + h + 1.0); sp.scale.set(5, 1.9, 1); }
+    stakeGrp.add(sp);
   }
 }
 
