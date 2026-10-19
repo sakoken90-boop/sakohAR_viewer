@@ -13,7 +13,7 @@ let arRoot, zup, root;            // arRoot > zup(Z-up→Y-up) > root(モデル)
 const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
-const APP_V = 47;   // ★S90 合わせ終わったら ロック（スクショの時に 触っても 動かない）。3回たたきで 解除
+const APP_V = 48;   // ★S91 AR 中の標識を 小さく（名前だけ）／AR 中も NO 杭を出す
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -434,6 +434,25 @@ function buildAxis() {
   axisLine.computeLineDistances(); root.add(axisLine);
 }
 
+// ★S91 AR 中の 標識（名前だけの 小さな札）。現場で「吹き出しが 大きい」「地盤高は 要らない」
+//   幅 1.6 m × 高さ 0.48 m（実寸）。ふつうの 3D 画面の 札（幅 6〜9 m）とは 別に作る
+let arLbl = false;                 // AR 中か（標識の 作り分けに使う）
+const AR_LW = 1.6, AR_LH = 0.48;
+function labelSmall(text) {
+  const cv = document.createElement('canvas'), s = 2, W = 160, H = 48;
+  cv.width = W * s; cv.height = H * s;
+  const x = cv.getContext('2d'); x.scale(s, s);
+  x.fillStyle = 'rgba(255,255,255,.85)'; x.strokeStyle = '#1b3a5c'; x.lineWidth = 2;
+  x.beginPath();
+  if (x.roundRect) x.roundRect(2, 2, W - 4, H - 4, 8); else x.rect(2, 2, W - 4, H - 4);
+  x.fill(); x.stroke();
+  x.fillStyle = '#16202b'; x.font = 'bold 28px system-ui'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(text, W / 2, H / 2 + 1);
+  const t = new THREE.CanvasTexture(cv); t.anisotropy = 4;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
+  sp.scale.set(AR_LW, AR_LH, 1); return sp;
+}
+
 function label(text, sub) {
   const cv = document.createElement('canvas'), s = 2;
   cv.width = 256 * s; cv.height = 96 * s;
@@ -452,12 +471,19 @@ function label(text, sub) {
 
 function buildStakes() {
   stakeGrp = new THREE.Group(); root.add(stakeGrp);
+  drawStakes();
+}
+// ★S91 AR 中は 小さな札（測点名だけ）を 低い所に。ふつうの画面は これまでどおり
+function drawStakes() {
+  while (stakeGrp.children.length) stakeGrp.remove(stakeGrp.children[0]);
   for (const k of M.stakes) {
-    const z = (k.z || 5) + 6.5;
-    const sp = label(k.sv_no.replace('+00.000', '').replace(/\+0?/, '+'), '設計 ' + k.ds.toFixed(2));
-    sp.position.set(k.x, k.y, z); stakeGrp.add(sp);
+    const z0 = k.z || 5;
+    const nm = k.sv_no.replace('+00.000', '').replace(/\+0?/, '+');
+    const top = arLbl ? z0 + 1.2 : z0 + 6.5 - 1.6;      // 線の上端
+    const sp = arLbl ? labelSmall(nm) : label(nm, '設計 ' + k.ds.toFixed(2));
+    sp.position.set(k.x, k.y, arLbl ? top + AR_LH / 2 + 0.1 : z0 + 6.5); stakeGrp.add(sp);
     const g = new THREE.BufferGeometry().setFromPoints(
-      [new THREE.Vector3(k.x, k.y, k.z || 5), new THREE.Vector3(k.x, k.y, z - 1.6)]);
+      [new THREE.Vector3(k.x, k.y, z0), new THREE.Vector3(k.x, k.y, top)]);
     stakeGrp.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x2b6cb0 })));
   }
 }
@@ -1319,7 +1345,10 @@ function arSkin(on) {
       + '立つ杭の頭に 緑の輪を合わせて「① 足元に合わせる」を押してください。';
     $('bAR').textContent = on ? 'AR終了' : (isQuickLook() ? 'AR（実寸）' : 'AR');
     $('bAR').classList.toggle('on', on);
-    stakeGrp.visible = on ? false : $('cStakes').checked;
+    // ★S91 AR 中も 測点（NO 杭）を 出す（これまでは 消していた）。標識は AR 用の 小さな札に 作り直す
+    arLbl = on;
+    try { drawStakes(); redrawAnchors(); } catch (e) {}
+    stakeGrp.visible = $('cStakes').checked;
     hud('');
   } catch (e) {}
 }
@@ -1579,8 +1608,10 @@ function redrawAnchors() {
       b.rotation.z = -tn + rot;          // モデル座標は (東,北)。接線方位に合わせる
       anchorGrp.add(b);
     }
-    const sp = label(a.name, a.z.toFixed(3) + ' m');
-    sp.position.set(a.x, a.y, a.z + h + 1.2); sp.scale.set(6, 2.3, 1);
+    // ★S91 AR 中は 名前だけの 小さな札を 柱の すぐ上に（地盤高は 出さない）
+    const sp = arLbl ? labelSmall(a.name) : label(a.name, a.z.toFixed(3) + ' m');
+    if (arLbl) sp.position.set(a.x, a.y, a.z + h + AR_LH / 2 + 0.1);
+    else { sp.position.set(a.x, a.y, a.z + h + 1.2); sp.scale.set(6, 2.3, 1); }
     anchorGrp.add(sp);
   }
   anchorGrp.visible = anchorsOn;      // ★S35 描き直しても表示状態を保つ
