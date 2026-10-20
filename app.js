@@ -14,7 +14,7 @@ const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
 let kataGrp;                      // ★S93 設計NO 法肩杭（橙の柱）。現況NO杭（stakeGrp）とは 別に 切り替える
-const APP_V = 50;   // ★S93 現況NO杭と 設計NO法肩杭の 表示を 別々に 切り替え
+const APP_V = 51;   // ★S94 ①にアンカー／合わせ直しの①は すぐロック／ロック解除中は モデルを隠す
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -1213,8 +1213,17 @@ function initAR() {
     else t = provPoint(1.5);
     if (!t) { $('arTip').textContent = 'まだ場所が定まりません。少し動かしてから もう一度 押してください。'; return; }
     anchorW = t; arProv = false; arApply();
+    // ★S94 床の輪郭の所に置いた時は その場所に アンカーを 打つ（目分量の時は 打たない）
+    if (reticle.visible && xrSession) arAnchorSet(lastHit); else arAnchorDrop();
     const kk = arPoint(), tn = curTargetName();
     arNote('①足元　立つ杭 ' + (kk.name || kk.sv_no) + (reticle.visible ? '　床の輪郭の所に置いた' : '　★床が拾えず 目分量（前 1.5 m・1.2 m 下）'));
+    // ★S94 ②が 済んでいれば（合わせ直しの ①）向きは そのままで ★すぐ ロックし直す
+    if (arSet) {
+      arLocked = true; lockTaps.length = 0;
+      arNote('①だけ 置き直した（向きは そのまま）→ ロック');
+      $('arTip').textContent = '足元を置き直しました（向きは そのまま）。★ロックしました。';
+      return;
+    }
     const nx = tn ? '次に、真ん中の印を ★' + tn + '（青い柱の杭）に重ねて' : '次に、堤防の上流側に向けて';
     $('arTip').textContent = reticle.visible
       ? '置きました。' + nx + '「② 向きを合わせる」を押してください。'
@@ -1457,7 +1466,8 @@ async function startAR() {
   try {
     const useOv = arOvOn();
     step('①カメラの起動' + (useOv ? '（重ね表示 あり）' : '（重ね表示 ★なし）'));
-    const opt = { requiredFeatures: ['hit-test'], optionalFeatures: [] };
+    // ★S94 anchors（アンカー）を 任意で 求める。使えなければ これまでどおり（数字の座標で 覚える）
+    const opt = { requiredFeatures: ['hit-test'], optionalFeatures: ['anchors'] };
     if (useOv) {
       opt.optionalFeatures.push('dom-overlay');
       opt.domOverlay = { root: document.getElementById('arov') || document.body };
@@ -1531,6 +1541,8 @@ async function startAR() {
 
     session.addEventListener('end', () => {
       arSkin(false);                                  // ★S76 見た目を 戻す
+      if (arAnchorMoved) arNote('アンカーが 足元を 動かした量（最大）' + (arAnchorMoved * 100).toFixed(1) + ' cm');
+      arAnchorDrop(); lastHit = null;                  // ★S94
       xrSession = null; hitSource = null; reticle.visible = false;
       viewerPos = null; viewerFwd = null; arProv = false;   // ★S77
       if (aim) aim.visible = false; aimHist.length = 0; arAimT = 0;   // ★S83
@@ -1572,7 +1584,8 @@ function arTapGate() {                     // true ＝ ふつうに ①② と�
   if (lockTaps.length >= 3) {
     lockTaps.length = 0; arLocked = false;
     arNote('ロックを外した（3回たたき）');
-    $('arTip').textContent = 'ロックを外しました。1回たたく＝①足元／2回＝②向き で 合わせ直せます。';
+    $('arTip').textContent = 'ロックを外しました（杭が見えるよう モデルは 隠しています）。'
+      + '1回たたく＝①足元を置き直す（向きは そのまま・すぐロック）／2回＝②向きを やり直す。';
   }
   return false;
 }
@@ -1586,7 +1599,22 @@ function provPoint(d) {
 
 function arFrame(frame) {
   if (!refSpace) return;
-  if (zup) zup.visible = arSet;                         // ★S86 ②が済むまで モデルは 出さない
+  // ★S86 ②が済むまで モデルは 出さない。★S94 ロックを外している間（合わせ直し中）も 出さない
+  if (zup) zup.visible = arModelVisible();
+  // ★S94 ①の点を AR のアンカー（現実の場所への目印）に付けておき、
+  //   端末が 自分の位置の見積もりを 直しても 足元が 現実の杭に 付いて行くようにする
+  if (arAnchor && frame.trackedAnchors && frame.trackedAnchors.has(arAnchor)) {
+    try {
+      const ap = frame.getPose(arAnchor.anchorSpace, refSpace);
+      if (ap) {
+        const p = new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(ap.transform.matrix));
+        if (anchorW && p.distanceTo(anchorW) > 0.002) {
+          if (!arAnchorMoved || p.distanceTo(anchorW) > arAnchorMoved) arAnchorMoved = p.distanceTo(anchorW);
+          anchorW.copy(p); arApply();
+        }
+      }
+    } catch (e) {}
+  }
   // ★S77 端末の位置・向きを 毎コマ 取っておく（床の検出が使えなくても これは取れる）
   const vp = frame.getViewerPose(refSpace);
   if (vp) {
@@ -1613,8 +1641,26 @@ function arFrame(frame) {
   if (hits.length) {
     const pose = hits[0].getPose(refSpace);
     reticle.visible = true; reticle.matrix.fromArray(pose.transform.matrix);
-  } else reticle.visible = false;
+    lastHit = hits[0];                                  // ★S94 ①で アンカーを 打つために 取っておく
+  } else { reticle.visible = false; lastHit = null; }
 }
+
+// ★S94 ①のアンカー
+let arAnchor = null, lastHit = null, arAnchorMoved = 0;
+function arAnchorDrop() {
+  try { if (arAnchor && arAnchor.delete) arAnchor.delete(); } catch (e) {}
+  arAnchor = null; arAnchorMoved = 0;
+}
+function arAnchorSet(hit) {
+  arAnchorDrop();
+  if (!hit || !hit.createAnchor) { arNote('①アンカー 使えない（この画面では 作れない）'); return; }
+  try {
+    hit.createAnchor().then(a => { arAnchor = a; arNote('①アンカー ★打った（現実の場所に 付いて行く）'); })
+      .catch(e => arNote('①アンカー 失敗：' + ((e && e.message) || e)));
+  } catch (e) { arNote('①アンカー 失敗：' + ((e && e.message) || e)); }
+}
+// ★S94 モデルを 出すのは ②が済んで ロックしている時だけ
+function arModelVisible() { return arSet && arLocked; }
 
 
 // ================= 現地合わせ（カメラ重ね）=================
