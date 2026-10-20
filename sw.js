@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v56';  // ★S99 狭い画面で ヘッダーを 詰めた
+const V = 'sd-viewer-v57';  // ★S100 初期設定で 根固め・かごマットの 稜線も 出す
 const CORE = ['./', './index.html', './app.js', './sd_model.json', './logo.png',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

@@ -14,7 +14,7 @@ const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
 let kataGrp;                      // ★S93 設計NO 法肩杭（橙の柱）。現況NO杭（stakeGrp）とは 別に 切り替える
-const APP_V = 56;   // ★S99 狭い画面で 右端の「表示」が はみ出していたのを 詰めた
+const APP_V = 57;   // ★S100 初期設定で 根固めブロック・かごマット4つの 稜線も 出す
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -219,10 +219,10 @@ const GROUPS = [
 // ★S35 上のどれにも入らない部品も 必ずチェックボックスを出す（AR基準点など）
 const GROUPED = (n) => GROUPS.some(([, test]) => test(n));
 // ★S97 初期設定（現場の希望）。かごマットの 横断図案も 既定で 出す
+// ★S100 根固めブロックと かごマット4つの 稜線も 既定で 出す（現場の希望）
 const OFF = new Set([
   '線_大型張ブロック', '線_縦帯コンクリート', '線_基礎コンクリートブロック',
-  '線_均しコンクリート', '線_根固めブロック', '線_かごマット2段_平面図',
-  '線_かごマット3段_平面図', '線_かごマット2段_横断図', '線_かごマット3段_横断図',
+  '線_均しコンクリート',
   '線_階段_本体', '線_階段_小口止工', '線_横帯工',
   'AR基準点']);          // ★S30 モデル側のポールは USDZ／SketchUp 用。
                         //    ビューアは app.js が自前で描くので既定 OFF（二重＋視界を塞ぐ）
