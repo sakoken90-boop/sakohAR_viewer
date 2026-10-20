@@ -14,7 +14,7 @@ const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
 let kataGrp;                      // ★S93 設計NO 法肩杭（橙の柱）。現況NO杭（stakeGrp）とは 別に 切り替える
-const APP_V = 54;   // ★S97 表示の初期設定（現場の希望）＋前回の状態を覚える＋初期設定に戻す
+const APP_V = 55;   // ★S98 タイトルに 会社のマーク
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -342,10 +342,11 @@ async function init() {
   });
 
   bindUI(); buildAnchors(); initView(); initFit();     // ★S97 initView：前回の状態／初期設定
-  $('sub').textContent = `三角形 ${M.parts.reduce((a, p) => a + p.f.length, 0).toLocaleString()}／`
-    + `設計追距 ${M.range.lo.toFixed(3)}〜${M.range.hi.toFixed(3)}`
+  // ★S41/S58 どの版を見ているか分かるように。★S98 スマホ幅でも 見えるよう 版を 先頭に
+  $('sub').textContent = `アプリ v${APP_V}`
     + (M.built ? `／データ ${M.built}` : '')
-    + `／アプリ v${APP_V}`;   // ★S41/S58 どの版を見ているか分かるように
+    + `／三角形 ${M.parts.reduce((a, p) => a + p.f.length, 0).toLocaleString()}`
+    + `／設計追距 ${M.range.lo.toFixed(3)}〜${M.range.hi.toFixed(3)}`;
   $('crs').innerHTML = `${M.origin.crs}<br>ローカル原点 X=${M.origin.X0} Y=${M.origin.Y0}<br>${M.origin.note}`;
   $('msg').classList.add('hide');
   addEventListener('resize', onResize);

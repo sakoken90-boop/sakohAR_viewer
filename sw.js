@@ -1,6 +1,6 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v54';  // ★S97 表示の初期設定＋前回の状態を覚える
-const CORE = ['./', './index.html', './app.js', './sd_model.json',
+const V = 'sd-viewer-v55';  // ★S98 タイトルに 会社のマーク（logo.png）
+const CORE = ['./', './index.html', './app.js', './sd_model.json', './logo.png',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 // ★S60 ここが今回の肝

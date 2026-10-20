@@ -80,6 +80,9 @@ select,input[type=number]{padding:6px;border:1px solid var(--line);border-radius
   padding:0 8px;background:rgba(255,255,255,.92);backdrop-filter:blur(6px);
   border-bottom:1px solid var(--line);z-index:10}
 #ttl{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+/* S98 会社のマーク（タイトルの左） */
+#logo{flex:none;width:36px;height:36px;border-radius:8px;display:block;object-fit:cover}
+@media (max-width:480px){ #logo{width:30px;height:30px;border-radius:6px} }
 #ttl small{display:block;font-weight:400;color:var(--sub);font-size:11px}
 .btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;
   padding:7px 10px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
@@ -128,6 +131,7 @@ input[type=range]{width:100%}
 <div id="loupeMag"></div>
 
 <div id="top">
+  <img id="logo" src="logo.png" alt="sakoh">
   <div id="ttl">塩田川 その4 左岸 完成形<small id="sub">読み込み中…</small></div>
   <button class="btn" id="bFit">現地合わせ</button>
   <button class="btn" id="bMeasure">計測</button>
