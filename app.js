@@ -14,7 +14,7 @@ const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
 let kataGrp;                      // ★S93 設計NO 法肩杭（橙の柱）。現況NO杭（stakeGrp）とは 別に 切り替える
-const APP_V = 55;   // ★S98 タイトルに 会社のマーク
+const APP_V = 56;   // ★S99 狭い画面で 右端の「表示」が はみ出していたのを 詰めた
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では

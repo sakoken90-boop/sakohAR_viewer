@@ -83,6 +83,13 @@ select,input[type=number]{padding:6px;border:1px solid var(--line);border-radius
 /* S98 会社のマーク（タイトルの左） */
 #logo{flex:none;width:36px;height:36px;border-radius:8px;display:block;object-fit:cover}
 @media (max-width:480px){ #logo{width:30px;height:30px;border-radius:6px} }
+/* S99 狭い画面（iPhone で 文字を拡大している時など）でも 右端の「表示」が はみ出さないように 詰める */
+@media (max-width:420px){
+  #top{gap:4px;padding:0 6px}
+  #top .btn{padding:6px 7px;font-size:12px}
+  #logo{width:28px;height:28px}
+}
+@media (max-width:300px){ #logo{display:none} }
 #ttl small{display:block;font-weight:400;color:var(--sub);font-size:11px}
 .btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;
   padding:7px 10px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
