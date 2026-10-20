@@ -14,7 +14,7 @@ const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
 let kataGrp;                      // ★S93 設計NO 法肩杭（橙の柱）。現況NO杭（stakeGrp）とは 別に 切り替える
-const APP_V = 51;   // ★S94 ①にアンカー／合わせ直しの①は すぐロック／ロック解除中は モデルを隠す
+const APP_V = 52;   // ★S95「準備ができました」の杭の組を 選び直しに 合わせて 書き換え
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -367,10 +367,7 @@ async function init() {
         //   → ★押してもらう。ボタンを目立たせて 案内するだけにする
         if (ok) {
           // ★S85 どの杭で合わせるのかを ここで 見せる（違っていたら「表示」で 選び直せる）
-          hud('★準備ができました。<b>' + selText() + '</b>　で合わせます。'
-            + (viewCarried ? '（透過・部品の表示も Safari の設定を 引き継ぎました）' : '')
-            + '違っていたら「表示」→「AR（実寸）の 基準の杭」で 選び直してから、'
-            + '上の <b>「AR（実寸）」</b>を押してください。');
+          vlReady = true; readyHud();
           const b = $('bAR'); if (b) { b.classList.add('on'); b.textContent = '▶ AR（実寸）'; }
         }
         else hud('★この画面では WebXR が見つかりませんでした。「AR」を押すと Quick Look で開きます。');
@@ -942,6 +939,7 @@ function setAnchor(v) {
   // ★S83 立つ杭と 向ける先が 同じになったら 向ける先を 選び直す
   try { const t = $('anchorT'); if (t && t.options.length && t.value === v) setTarget(autoTarget(v)); } catch (e) {}
   try { if (anchorGrp) redrawAnchors(); } catch (e) {}     // ★選んだ杭を 緑にする
+  try { readyHud(); } catch (e) {}                         // ★S95
   if (anchorW) arApply();
 }
 
@@ -1049,6 +1047,17 @@ function autoTarget(v) {
   });
   return b;
 }
+// ★S95「準備ができました」の文。★杭を 選び直したら 書き換える
+//   （S94 まで 開き直した時点の 組のまま 残り、選び直した後も「AR5」と 出ていた）
+let vlReady = false;
+function readyHud() {
+  if (!vlReady || xrSession) return;
+  hud('★準備ができました。<b>' + selText() + '</b>　で合わせます。'
+    + (viewCarried ? '（透過・部品の表示も Safari の設定を 引き継ぎました）' : '')
+    + '違っていたら「表示」→「AR（実寸）の 基準の杭」で 選び直してから、'
+    + '上の <b>「AR（実寸）」</b>を押してください。');
+}
+
 function setTarget(v) {
   for (const id of ['anchorT', 'anchorT2']) {
     const el = $(id); if (!el) continue;
@@ -1056,6 +1065,7 @@ function setTarget(v) {
   }
   try { localStorage.setItem(ANCT, v); } catch (e) {}
   try { if (anchorGrp) redrawAnchors(); } catch (e) {}     // ★向ける先を 青にする
+  try { readyHud(); } catch (e) {}                         // ★S95
 }
 
 function initAR() {

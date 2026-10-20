@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v51';  // ★S94 ①にアンカー／合わせ直しの①は すぐロック／解除中は モデルを隠す
+const V = 'sd-viewer-v52';  // ★S95「準備ができました」の杭の組を 選び直しに 合わせて 書き換え
 const CORE = ['./', './index.html', './app.js', './sd_model.json',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
