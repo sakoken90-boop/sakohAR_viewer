@@ -143,12 +143,17 @@ input[type=range]{width:100%}
       <button class="btn" id="bAll" style="flex:1">全部出す</button>
       <button class="btn" id="bNone" style="flex:1">全部消す</button>
     </div>
+    <div class="row" style="margin-top:6px">
+      <button class="btn" id="bViewReset" style="flex:1">表示を初期設定に戻す</button>
+    </div>
+    <div class="tiny">表示・透過・測点ラベルの設定は、この端末に覚えておき、次に開いたときもその状態で始まります。
+      初期設定は、かごマット2案とも表示、透過は面・構造物とも50、現況NO杭は非表示、基準の杭は AR3 → AR5 です。</div>
   </div>
 
   <div class="sec">
     <h3>透過</h3>
-    <div class="row"><span class="k" style="width:5.5em">完成形の面</span><input type="range" id="opSurf" min="0" max="100" value="100"><span class="mono k" id="opSurfV" style="width:3em;text-align:right">100</span></div>
-    <div class="row"><span class="k" style="width:5.5em">構造物</span><input type="range" id="opStr" min="0" max="100" value="100"><span class="mono k" id="opStrV" style="width:3em;text-align:right">100</span></div>
+    <div class="row"><span class="k" style="width:5.5em">完成形の面</span><input type="range" id="opSurf" min="0" max="100" value="50"><span class="mono k" id="opSurfV" style="width:3em;text-align:right">50</span></div>
+    <div class="row"><span class="k" style="width:5.5em">構造物</span><input type="range" id="opStr" min="0" max="100" value="50"><span class="mono k" id="opStrV" style="width:3em;text-align:right">50</span></div>
     <div class="tiny">面を透かすと、基礎・均し・根固めなど中の構造が見えます。</div>
   </div>
 
@@ -162,7 +167,7 @@ input[type=range]{width:100%}
 
   <div class="sec">
     <h3>測点ラベル</h3>
-    <div class="row"><label style="flex:none"><input type="checkbox" id="cStakes" checked> 現況NO杭（現況中心線＝川の中の測点）を出す</label></div>
+    <div class="row"><label style="flex:none"><input type="checkbox" id="cStakes"> 現況NO杭（現況中心線＝川の中の測点）を出す</label></div>
     <div class="row"><label style="flex:none"><input type="checkbox" id="cKata" checked> 設計NO 法肩杭（橙の柱・法線確認用）を出す</label></div>
     <div class="row"><label style="flex:none"><input type="checkbox" id="cAxis" checked> 設計中心線を出す</label></div>
     <div class="row"><label style="flex:none"><input type="checkbox" id="cAnchor" checked> AR基準点（赤いポールと名前）を出す</label></div>

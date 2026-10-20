@@ -14,7 +14,7 @@ const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
 let kataGrp;                      // ★S93 設計NO 法肩杭（橙の柱）。現況NO杭（stakeGrp）とは 別に 切り替える
-const APP_V = 53;   // ★S96 画面に出る文から ★ を外した（注記の ★ は そのまま）
+const APP_V = 54;   // ★S97 表示の初期設定（現場の希望）＋前回の状態を覚える＋初期設定に戻す
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -218,7 +218,8 @@ const GROUPS = [
 ];
 // ★S35 上のどれにも入らない部品も 必ずチェックボックスを出す（AR基準点など）
 const GROUPED = (n) => GROUPS.some(([, test]) => test(n));
-const OFF = new Set(['かごマット2段_横断図', 'かごマット3段_横断図',
+// ★S97 初期設定（現場の希望）。かごマットの 横断図案も 既定で 出す
+const OFF = new Set([
   '線_大型張ブロック', '線_縦帯コンクリート', '線_基礎コンクリートブロック',
   '線_均しコンクリート', '線_根固めブロック', '線_かごマット2段_平面図',
   '線_かごマット3段_平面図', '線_かごマット2段_横断図', '線_かごマット3段_横断図',
@@ -340,7 +341,7 @@ async function init() {
     }, 470);
   });
 
-  bindUI(); buildAnchors(); initFit();
+  bindUI(); buildAnchors(); initView(); initFit();     // ★S97 initView：前回の状態／初期設定
   $('sub').textContent = `三角形 ${M.parts.reduce((a, p) => a + p.f.length, 0).toLocaleString()}／`
     + `設計追距 ${M.range.lo.toFixed(3)}〜${M.range.hi.toFixed(3)}`
     + (M.built ? `／データ ${M.built}` : '')
@@ -608,6 +609,22 @@ function bindUI() {
   $('cAxis').onchange = e => { axisLine.visible = e.target.checked; };
   $('cAnchor').onchange = e => { anchorsOn = e.target.checked; anchorGrp.visible = anchorsOn; };
 
+  // ★S97 表示の 初期設定と 前回の状態
+  //   はじめて開いた時は 初期設定（VIEW_DEF）。触ったら 端末に 覚えて、次に開いた時は 前回の状態。
+  //   「表示を初期設定に戻す」で 初期設定に 戻す。App Clip へは これまでどおり 飛び先で 持って行く
+  const sv = () => { try { saveView(); } catch (e) {} };
+  document.querySelectorAll('#parts input').forEach(b => b.addEventListener('change', sv));
+  $('bAll').addEventListener('click', sv); $('bNone').addEventListener('click', sv);
+  $('opSurf').addEventListener('input', sv); $('opStr').addEventListener('input', sv);
+  for (const id of VIEW_CHK) if ($(id)) $(id).addEventListener('change', sv);
+  if ($('bViewReset')) $('bViewReset').onclick = () => {
+    try { localStorage.removeItem(VIEWKEY); } catch (e) {}
+    applyView(viewDefault());
+    try { setAnchor(ANC_DEF); setTarget(ANCT_DEF); } catch (e) {}
+    hud('表示を初期設定に戻しました。');
+  };
+  // 前回の状態（無ければ 初期設定）の 当てはめは initView() で（AR 基準点を 作った後）
+
   $('bMeasure').onclick = () => {
     measureMode = !measureMode; $('bMeasure').classList.toggle('on', measureMode);
     clearMarks();
@@ -652,6 +669,47 @@ function bindUI() {
   }
   renderer.domElement.addEventListener('pointerdown', onDown);
   renderer.domElement.addEventListener('pointerup', onUp);
+}
+
+// ★S97 表示の 初期設定（現場の希望・2026-10-20）
+const VIEWKEY = 'sd_view';
+const VIEW_CHK = ['cStakes', 'cKata', 'cAxis', 'cAnchor'];
+const VIEW_DEF = { ops: 50, opt: 50, chk: { cStakes: false, cKata: true, cAxis: true, cAnchor: true } };
+const ANC_DEF = 'a2', ANCT_DEF = 'a4';      // 立つ杭 AR3 ／ 向ける先 AR5（値で持つ・S82 の教訓）
+function viewDefault() {
+  const vis = {};
+  for (const n in meshes) vis[n] = !OFF.has(n);
+  return { v: 1, vis, ops: VIEW_DEF.ops, opt: VIEW_DEF.opt, chk: { ...VIEW_DEF.chk } };
+}
+function saveView() {
+  const vis = {};
+  for (const n in meshes) vis[n] = meshes[n].visible;
+  const chk = {};
+  for (const id of VIEW_CHK) if ($(id)) chk[id] = $(id).checked;
+  localStorage.setItem(VIEWKEY, JSON.stringify({ v: 1, vis, ops: +$('opSurf').value, opt: +$('opStr').value, chk }));
+}
+function applyView(s) {
+  if (!s) return;
+  for (const n in meshes) if (s.vis && n in s.vis) meshes[n].visible = !!s.vis[n];
+  document.querySelectorAll('#parts input').forEach(b => {
+    const nm = b.closest('label') && b.closest('label').textContent.trim();
+    if (nm && meshes[nm]) b.checked = meshes[nm].visible;
+  });
+  for (const [id, v] of [['opSurf', s.ops], ['opStr', s.opt]]) {
+    if (v == null || !$(id)) continue;
+    $(id).value = v; $(id).dispatchEvent(new Event('input'));
+  }
+  for (const id of VIEW_CHK) {
+    if (!$(id) || !s.chk || !(id in s.chk)) continue;
+    $(id).checked = !!s.chk[id]; $(id).dispatchEvent(new Event('change'));
+  }
+}
+
+// ★S97 前回の状態（無ければ 初期設定）を 当てはめる。buildAnchors() の後に 呼ぶ
+function initView() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(VIEWKEY) || 'null'); } catch (e) {}
+  try { applyView(saved && saved.v === 1 ? saved : viewDefault()); } catch (e) {}
 }
 
 function setAll(v) {
@@ -1088,7 +1146,8 @@ function initAR() {
   //   S26 で ★鋲を先に並べた ので、★AR4 が既定 になっていた。
   //   現場は AR1 のつもりで 使っていた → ★117 m ずれる。
   //   → ★既定は AR1。前に選んだものが あれば それを 覚えておく
-  let v0 = 'a0';
+  // ★S97 はじめての 既定は 現場の希望で AR3（ANC_DEF）
+  let v0 = ANC_DEF;
   try { const sv = localStorage.getItem(ANC); if (sv) v0 = sv; } catch (e) {}
   // ★S85 App Clip で 開き直した時は 飛び先に 付けてきた杭を 最優先（Safari で選んだもの）
   const qs = urlSel();
@@ -1112,6 +1171,7 @@ function initAR() {
   try { t0 = localStorage.getItem(ANCT); } catch (e) {}
   if (qs.t) t0 = qs.t;                                   // ★S85 飛び先に 付けてきたもの
   try { viewCarried = viewFromUrl(); } catch (e) {}      // ★S86 透過と 部品の表示
+  if (!t0 && $('anchor').value === ANC_DEF) t0 = ANCT_DEF;   // ★S97 はじめての 既定は AR3 → AR5
   if (!t0 || t0 === $('anchor').value || (t0 !== TNONE && !ptOf(t0))) t0 = autoTarget($('anchor').value);
   setTarget(t0);
 
