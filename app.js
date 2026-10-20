@@ -14,7 +14,7 @@ const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
 let kataGrp;                      // ★S93 設計NO 法肩杭（橙の柱）。現況NO杭（stakeGrp）とは 別に 切り替える
-const APP_V = 52;   // ★S95「準備ができました」の杭の組を 選び直しに 合わせて 書き換え
+const APP_V = 53;   // ★S96 画面に出る文から ★ を外した（注記の ★ は そのまま）
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -95,7 +95,7 @@ function vlLoad() {
       else fin({ ok: false,
         why: 'SDK が初期化されませんでした。\n'
            + 'launchar.app の管理画面で ドメイン\n  sakoken90-boop.github.io\n'
-           + 'が登録されているか 確かめてください（★省略なしの全部）。' });
+           + 'が登録されているか 確かめてください（省略なしの全部）。' });
     }, 8000);
   });
 }
@@ -116,7 +116,7 @@ function withTimeout(p, ms, label) {
   return Promise.race([
     Promise.resolve(p),
     new Promise((_, rj) => setTimeout(
-      () => rj(new Error('★' + label + 'が ' + (ms / 1000) + ' 秒 返ってきませんでした。')), ms)),
+      () => rj(new Error('' + label + 'が ' + (ms / 1000) + ' 秒 返ってきませんでした。')), ms)),
   ]);
 }
 function waitXR(ms) {
@@ -198,7 +198,7 @@ function vlNote(g, d) {
   try {
     const h = $('hud');
     if (h) h.textContent = 'Variant Launch へ（' + g.how + '）'
-         + (g.how === '①' ? '' : '★開いた先で もう一度「AR（実寸）」を押してください')
+         + (g.how === '①' ? '' : '開いた先で もう一度「AR（実寸）」を押してください')
          + '　' + vlDesc(d);
   } catch (e) {}
 }
@@ -343,8 +343,8 @@ async function init() {
   bindUI(); buildAnchors(); initFit();
   $('sub').textContent = `三角形 ${M.parts.reduce((a, p) => a + p.f.length, 0).toLocaleString()}／`
     + `設計追距 ${M.range.lo.toFixed(3)}〜${M.range.hi.toFixed(3)}`
-    + (M.built ? `／★データ ${M.built}` : '')
-    + `／★アプリ v${APP_V}`;   // ★S41/S58 どの版を見ているか分かるように
+    + (M.built ? `／データ ${M.built}` : '')
+    + `／アプリ v${APP_V}`;   // ★S41/S58 どの版を見ているか分かるように
   $('crs').innerHTML = `${M.origin.crs}<br>ローカル原点 X=${M.origin.X0} Y=${M.origin.Y0}<br>${M.origin.note}`;
   $('msg').classList.add('hide');
   addEventListener('resize', onResize);
@@ -370,7 +370,7 @@ async function init() {
           vlReady = true; readyHud();
           const b = $('bAR'); if (b) { b.classList.add('on'); b.textContent = '▶ AR（実寸）'; }
         }
-        else hud('★この画面では WebXR が見つかりませんでした。「AR」を押すと Quick Look で開きます。');
+        else hud('この画面では WebXR が見つかりませんでした。「AR」を押すと Quick Look で開きます。');
       });
     }
   } catch (e) {}
@@ -612,7 +612,7 @@ function bindUI() {
     measureMode = !measureMode; $('bMeasure').classList.toggle('on', measureMode);
     clearMarks();
     hud(measureMode ? ('計測モード：2点をタップしてください。'
-        + (snapOn ? '<br><span class="k">★特徴線の節点（法肩・天端・法尻・ブロックの角など）に吸い付きます。'
+        + (snapOn ? '<br><span class="k">特徴線の節点（法肩・天端・法尻・ブロックの角など）に吸い付きます。'
                     + '外すときは 表示 →「計測」→ スナップ の目を外す</span>' : '')) : '');
   };
   // ★S66 Variant Launch（iOS の鋲基準 AR）の設定
@@ -726,7 +726,7 @@ function onUp(e) {
   if (!sn && !hits.length) { if (!measureMode) hud(''); return; }
   let m, src;
   if (sn) {
-    m = sn.m; src = `★${sn.kind}　${sn.name.replace(/^線_/, '')}`;
+    m = sn.m; src = `${sn.kind}　${sn.name.replace(/^線_/, '')}`;
   } else {
     const w = hits[0].point.clone(); root.worldToLocal(w);   // モデル座標へ
     m = { e: w.x, n: w.y, z: w.z }; src = hits[0].object.name;
@@ -1052,7 +1052,7 @@ function autoTarget(v) {
 let vlReady = false;
 function readyHud() {
   if (!vlReady || xrSession) return;
-  hud('★準備ができました。<b>' + selText() + '</b>　で合わせます。'
+  hud('準備ができました。<b>' + selText() + '</b>　で合わせます。'
     + (viewCarried ? '（透過・部品の表示も Safari の設定を 引き継ぎました）' : '')
     + '違っていたら「表示」→「AR（実寸）の 基準の杭」で 選び直してから、'
     + '上の <b>「AR（実寸）」</b>を押してください。');
@@ -1073,7 +1073,7 @@ function initAR() {
     if (!el) return;
     (M.anchors || []).forEach((a, i) => {        // ★鋲を先に並べる
       const o = document.createElement('option');
-      o.value = 'a' + i; o.textContent = `★${a.name}（鋲・設計 ${a.ds.toFixed(0)}／離れ ${a.off}）`;
+      o.value = 'a' + i; o.textContent = `${a.name}（鋲・設計 ${a.ds.toFixed(0)}／離れ ${a.off}）`;
       el.appendChild(o);
     });
     M.stakes.forEach((k, i) => {
@@ -1140,14 +1140,14 @@ function initAR() {
   const vlUse = quickLook && vlOn() && vlKey();
   $('uPlat').innerHTML =
     !quickLook
-      ? '★この端末は <b>Android など</b>です。AR は <b>WebXR</b>（鋲基準）で開くので、'
+      ? 'この端末は <b>Android など</b>です。AR は <b>WebXR</b>（鋲基準）で開くので、'
         + '<b>下の選択は使いません</b>。全部品が はじめから正しい高さで出ます。'
     : vlUse
-      ? '★この端末は <b>iPhone / iPad</b> です。いまは <b>Variant Launch 経由の WebXR</b>'
+      ? 'この端末は <b>iPhone / iPad</b> です。いまは <b>Variant Launch 経由の WebXR</b>'
         + '（鋲基準）で開く設定なので、<b>下の選択は使いません</b>。'
         + '全部品が はじめから正しい高さで出ます。<br>'
         + '※ Quick Look に戻したいときは 下の「AR（iPhone / iPad・実験）」の目を外してください。'
-      : '★この端末は <b>iPhone / iPad</b> です。AR（実寸）は <b>Quick Look</b> で開くので、'
+      : 'この端末は <b>iPhone / iPad</b> です。AR（実寸）は <b>Quick Look</b> で開くので、'
         + '下の選択が効きます。';
 
   $('bAR').onclick = async () => {
@@ -1226,18 +1226,18 @@ function initAR() {
     // ★S94 床の輪郭の所に置いた時は その場所に アンカーを 打つ（目分量の時は 打たない）
     if (reticle.visible && xrSession) arAnchorSet(lastHit); else arAnchorDrop();
     const kk = arPoint(), tn = curTargetName();
-    arNote('①足元　立つ杭 ' + (kk.name || kk.sv_no) + (reticle.visible ? '　床の輪郭の所に置いた' : '　★床が拾えず 目分量（前 1.5 m・1.2 m 下）'));
+    arNote('①足元　立つ杭 ' + (kk.name || kk.sv_no) + (reticle.visible ? '　床の輪郭の所に置いた' : '　床が拾えず 目分量（前 1.5 m・1.2 m 下）'));
     // ★S94 ②が 済んでいれば（合わせ直しの ①）向きは そのままで ★すぐ ロックし直す
     if (arSet) {
       arLocked = true; lockTaps.length = 0;
       arNote('①だけ 置き直した（向きは そのまま）→ ロック');
-      $('arTip').textContent = '足元を置き直しました（向きは そのまま）。★ロックしました。';
+      $('arTip').textContent = '足元を置き直しました（向きは そのまま）。ロックしました。';
       return;
     }
-    const nx = tn ? '次に、真ん中の印を ★' + tn + '（青い柱の杭）に重ねて' : '次に、堤防の上流側に向けて';
+    const nx = tn ? '次に、真ん中の印を ' + tn + '（青い柱の杭）に重ねて' : '次に、堤防の上流側に向けて';
     $('arTip').textContent = reticle.visible
       ? '置きました。' + nx + '「② 向きを合わせる」を押してください。'
-      : '★床が使えないので 足元を 目分量で置きました（精度は落ちます）。' + nx + '「② 向きを合わせる」を押してください。';
+      : '床が使えないので 足元を 目分量で置きました（精度は落ちます）。' + nx + '「② 向きを合わせる」を押してください。';
   };
   $('bHeading').onclick = () => {
     if (!anchorW) { $('arTip').textContent = '先に「① 足元に合わせる」を押してください。'; return; }
@@ -1246,14 +1246,14 @@ function initAR() {
     if (T) {
       const t1 = arAimT, t2 = Date.now(); arAimT = 0;
       if (aimBusy) return;                               // ★S86 取り込み中の たたきは 無視
-      if (arProv) { arNote('②向き ★①がまだ（仮置きのまま）なので 何もしていない'); $('arTip').textContent = '先に「① 足元に合わせる」を押してください。'; return; }
+      if (arProv) { arNote('②向き ①がまだ（仮置きのまま）なので 何もしていない'); $('arTip').textContent = '先に「① 足元に合わせる」を押してください。'; return; }
       // ★S86 手ぶれ対策。2回たたいた ★あと 1.5 秒 構えたままにしてもらい、
       //   たたく前（0.8〜0.15 秒前）と たたいた後（0.25〜1.75 秒後）の 向きを 平均する。
       //   たたいた瞬間の 揺れは 使わない。取り込み中は 印が ★黄色 になる
       const r1 = t1 ? [t1 - 800, t1 - 150] : [t2 - 800, t2 - 150];
       const r2 = [t2 + 250, t2 + 1750];
       aimBusy = true; aimColor(0xf5c400);
-      $('arTip').textContent = '★そのまま 1.5 秒 構えていてください（印が黄色の間）。';
+      $('arTip').textContent = 'そのまま 1.5 秒 構えていてください（印が黄色の間）。';
       setTimeout(() => {
         aimBusy = false; aimColor(0xe61ea0);
         if (!xrSession || !anchorW) return;
@@ -1262,7 +1262,7 @@ function initAR() {
         const k = arPoint();
         const r = solveHeading(k, T, anchorW, s);
         if (!r) {
-          arNote('②向き ★解けない（立つ杭 ' + (k.name || k.sv_no) + ' → 向ける先 ' + (T.name || T.sv_no) + '）');
+          arNote('②向き 解けない（立つ杭 ' + (k.name || k.sv_no) + ' → 向ける先 ' + (T.name || T.sv_no) + '）');
           $('arTip').textContent = '向きが解けませんでした。立つ杭の近くで、向ける先の杭に 印を重ねて もう一度。'; return;
         }
         headingBase = r.h;
@@ -1274,7 +1274,7 @@ function initAR() {
           + '　使った向き ' + s.n + ' コマの平均（手のぶれ ±' + s.sd.toFixed(2) + '°。'
           + '平均しているので 結果の誤差は これより ずっと小さい）');
         $('arTip').textContent = '向きを合わせました（' + (T.name || T.sv_no) + ' まで ' + r.L.toFixed(1) + ' m）。'
-          + '青い柱が その杭に 乗っているか 見てください。★ロックしました（画面に触れても 動きません。'
+          + '青い柱が その杭に 乗っているか 見てください。ロックしました（画面に触れても 動きません。'
           + '合わせ直すときは 3回 続けて たたく）';
       }, 1800);
       return;
@@ -1295,7 +1295,7 @@ function initAR() {
     heading = headingBase; arSet = true; arApply();
     arLocked = true; lockTaps.length = 0;               // ★S90
     $('arTip').textContent = '向きを合わせました。ずれていれば「回転」「高さ」で微調整してください。'
-      + '★ロックしました（合わせ直すときは 3回 続けて たたく）';
+      + 'ロックしました（合わせ直すときは 3回 続けて たたく）';
   };
 }
 
@@ -1351,7 +1351,7 @@ function aimSampleW(rs) {
 // AR 中の できごとを 記録に足して すぐ 書き置きする（AR 中は 画面に出せないため）
 function arNote(s) {
   arLog.push(new Date().toLocaleTimeString() + '　' + s);
-  arLogSave('★AR の記録（途中まで）');
+  arLogSave('AR の記録（途中まで）');
 }
 
 function nearestAxis(sd) {
@@ -1418,7 +1418,7 @@ function arSkin(on) {
     if (on) { $('sheet').classList.remove('open'); $('bPanel').classList.remove('on'); }
     $('arui').classList.toggle('show', on);
     // ★AR 中は 書き換えが 画面に出ないことがあるので 案内も ★先に入れておく
-    if (on) $('arTip').textContent = '★モデルは ②が済むまで 出しません（杭が 見えるように）。'
+    if (on) $('arTip').textContent = 'モデルは ②が済むまで 出しません（杭が 見えるように）。'
       + '立つ杭の頭に 緑の輪を合わせて「① 足元に合わせる」を押してください。';
     $('bAR').textContent = on ? 'AR終了' : (isQuickLook() ? 'AR（実寸）' : 'AR');
     $('bAR').classList.toggle('on', on);
@@ -1453,7 +1453,7 @@ function arLogPeek() {
     const o = JSON.parse(raw);
     if (!o || !o.l || !o.l.length) return;
     const min = Math.round((Date.now() - (o.t || 0)) / 60000);
-    setTimeout(() => alert('★前回の AR の記録（' + min + ' 分前）\n' + (o.head || '') + '\n\n'
+    setTimeout(() => alert('前回の AR の記録（' + min + ' 分前）\n' + (o.head || '') + '\n\n'
       + o.l.join('\n')), 900);
   } catch (e) {}
 }
@@ -1467,7 +1467,7 @@ async function startAR() {
     hud('AR を開始しています…　' + s);          // ★出れば出るで よい
   };
 
-  step('⓪画面を AR 用にする　★' + selText()
+  step('⓪画面を AR 用にする　' + selText()
     + '　透過 面' + $('opSurf').value + '／構造物' + $('opStr').value);
   arSkin(true);
   // ★描き直しを 2 コマ待ってから 入る（切り替えを 確実に 間に合わせる）
@@ -1475,7 +1475,7 @@ async function startAR() {
 
   try {
     const useOv = arOvOn();
-    step('①カメラの起動' + (useOv ? '（重ね表示 あり）' : '（重ね表示 ★なし）'));
+    step('①カメラの起動' + (useOv ? '（重ね表示 あり）' : '（重ね表示 なし）'));
     // ★S94 anchors（アンカー）を 任意で 求める。使えなければ これまでどおり（数字の座標で 覚える）
     const opt = { requiredFeatures: ['hit-test'], optionalFeatures: ['anchors'] };
     if (useOv) {
@@ -1501,22 +1501,22 @@ async function startAR() {
     for (const t of ['local', 'local-floor', 'viewer']) {
       try {
         refSpace = await withTimeout(session.requestReferenceSpace(t), 8000, '③基準の空間（' + t + '）');
-        rsType = t; step('　→ ★' + t + ' が使える'); break;
+        rsType = t; step('　→ ' + t + ' が使える'); break;
       } catch (e) { step('　→ ' + t + ' は駄目'); }
     }
-    if (!refSpace) throw new Error('★基準の空間が どれも取れませんでした。');
-    try { renderer.xr.setReferenceSpaceType(rsType); step('　→ three にも ★' + rsType + ' を使わせた'); }
-    catch (e) { step('　→ ★型の指定に失敗：' + ((e && e.message) || e)); }
+    if (!refSpace) throw new Error('基準の空間が どれも取れませんでした。');
+    try { renderer.xr.setReferenceSpaceType(rsType); step('　→ three にも ' + rsType + ' を使わせた'); }
+    catch (e) { step('　→ 型の指定に失敗：' + ((e && e.message) || e)); }
 
     step('②描画の引き渡し');
     await withTimeout(renderer.xr.setSession(session), 10000, '②描画の引き渡し');
-    step('　→ 引き渡し ★済み（isPresenting=' + (renderer.xr.isPresenting ? 'はい' : '★いいえ') + '）');
+    step('　→ 引き渡し 済み（isPresenting=' + (renderer.xr.isPresenting ? 'はい' : 'いいえ') + '）');
 
     step('④床の検出');
     try {
       const viewer = await withTimeout(session.requestReferenceSpace('viewer'), 8000, '④基準（viewer）');
       hitSource = await withTimeout(session.requestHitTestSource({ space: viewer }), 10000, '④床の検出');
-      step('　→ 床の検出 ★使える');
+      step('　→ 床の検出 使える');
     } catch (e) { hitSource = null; step('　→ 床の検出 は使えない（' + ((e && e.message) || e) + '）'); }
 
     // ★S78 ★arFrame を待たずに ここで 仮置きする。
@@ -1526,10 +1526,10 @@ async function startAR() {
     if (!anchorW) { anchorW = new THREE.Vector3(0, -1.2, -3); arProv = true; arApply(); }
 
     step('⑤できあがり');
-    arLogSave('★AR に入った所までの 記録');      // ★S79 ここで いったん 書き置き
+    arLogSave('AR に入った所までの 記録');      // ★S79 ここで いったん 書き置き
     $('arTip').textContent = hitSource
       ? '床を映して輪郭が出たら「① 足元に合わせる」を押してください。'
-      : '★床の検出が使えませんでした。画面の中央が 足元に来るように構えて「① 足元に合わせる」を押してください。';
+      : '床の検出が使えませんでした。画面の中央が 足元に来るように構えて「① 足元に合わせる」を押してください。';
 
     // ★S78 ★画面タップは XR の select で拾う。
     //   これは dom-overlay が効いていなくても 必ず届く（WebXR の決まり）。
@@ -1562,12 +1562,12 @@ async function startAR() {
       anchorW = null; heading = 0; headingBase = 0; zOff = 0;
       $('arRot').value = 0; $('arZ').value = 0;
       // ★AR 中は 画面に出せなかったので ここで まとめて見せる
-      arLogShow('★AR の記録（うまく行った分も含みます）');
+      arLogShow('AR の記録（うまく行った分も含みます）');
     });
   } catch (e) {
     arSkin(false);                                    // ★しくじったら 戻す
-    step('★止まった：' + ((e && e.message) || e));
-    arLogShow('★AR を開始できませんでした。どこまで進んだか：');
+    step('止まった：' + ((e && e.message) || e));
+    arLogShow('AR を開始できませんでした。どこまで進んだか：');
     throw e;
   }
 }
@@ -1665,7 +1665,7 @@ function arAnchorSet(hit) {
   arAnchorDrop();
   if (!hit || !hit.createAnchor) { arNote('①アンカー 使えない（この画面では 作れない）'); return; }
   try {
-    hit.createAnchor().then(a => { arAnchor = a; arNote('①アンカー ★打った（現実の場所に 付いて行く）'); })
+    hit.createAnchor().then(a => { arAnchor = a; arNote('①アンカー 打った（現実の場所に 付いて行く）'); })
       .catch(e => arNote('①アンカー 失敗：' + ((e && e.message) || e)));
   } catch (e) { arNote('①アンカー 失敗：' + ((e && e.message) || e)); }
 }
@@ -1804,7 +1804,7 @@ function record(ndc) {
   $('fitState').textContent = shots.length === 1
     ? `${target} で合わせ済` : `${shots.length} 点の平均で合わせ済`;
   if (shots.length === 1) {
-    $('fitTip').textContent = `★${target} を記録しました（緑＝記録済）。`
+    $('fitTip').textContent = `${target} を記録しました（緑＝記録済）。`
       + '続けて 別の基準点でも「記録」すると 平均が効いて精度が上がります。'
       + '狙う点は 自動で 次に遠い未記録の点に進みます（チップを押せば手で選べます）。';
   } else {
@@ -1884,7 +1884,7 @@ async function startFit() {
   $('bFit').classList.add('on'); $('sheet').classList.remove('open'); $('bPanel').classList.remove('on');
   $('fitState').textContent = '未合わせ';
   $('fitTip').textContent = '① 立っている基準点と カメラの高さ（レンズまで）を入れる　'
-    + '② 見えている中で ★一番遠い基準点を選び、画面中央の十字にその杭を重ねて「記録」　'
+    + '② 見えている中で 一番遠い基準点を選び、画面中央の十字にその杭を重ねて「記録」　'
     + '③ もう1〜2点でも記録すると 平均が効く（ルーペで拡大できます）';
 }
 function endFit() {
@@ -1945,7 +1945,7 @@ function zOffset(A) {
     + rows.map(r => '<span class="mono">' + r.n + '　'
         + (r.d > 0 ? 'モデルを ' + r.d.toFixed(3) + ' m 下げる'
                    : 'モデルを ' + (-r.d).toFixed(3) + ' m 上げる') + '</span>').join('<br>')
-    + '<br>★きちんと直すには 書き出した CSV を PC に送って 作り直してください。';
+    + '<br>きちんと直すには 書き出した CSV を PC に送って 作り直してください。';
 }
 function zCollect() {
   const o = {};
