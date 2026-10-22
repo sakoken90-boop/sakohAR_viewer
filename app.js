@@ -14,7 +14,7 @@ const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
 let kataGrp;                      // ★S93 設計NO 法肩杭（橙の柱）。現況NO杭（stakeGrp）とは 別に 切り替える
-const APP_V = 60;   // ★S103b ふつうの 3D 画面の 測点の札も 1/3 に（S103 AR 中の札 1/3）
+const APP_V = 61;   // ★S104 AR10 を削除（民地内で立ち入れない）。モデル・基準点の入れ替え
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
