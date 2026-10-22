@@ -14,7 +14,7 @@ const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
 let kataGrp;                      // ★S93 設計NO 法肩杭（橙の柱）。現況NO杭（stakeGrp）とは 別に 切り替える
-const APP_V = 59;   // ★S103 AR 中の 測点の札（現況NO杭・設計NO法肩杭）を 1/3 に
+const APP_V = 60;   // ★S103b ふつうの 3D 画面の 測点の札も 1/3 に（S103 AR 中の札 1/3）
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -440,6 +440,8 @@ let arLbl = false;                 // AR 中か（標識の 作り分けに使�
 const AR_LW = 1.6, AR_LH = 0.48;
 // ★S103 測点（現況NO杭・設計NO法肩杭）の札は さらに 1/3（高さ 0.16 m）。AR基準点の札は 0.48 m のまま
 const AR_LH_NO = AR_LH / 3;
+// ★S103b ふつうの 3D 画面の 測点の札も 1/3（現況NO杭 9×3.4 → 3×1.13 ／ 法肩 5×1.9 → 1.67×0.63）
+const NO_K = 1 / 3;
 function labelSmall(text, edge, lh = AR_LH) {
   const s = 2, H = 48;
   const m = document.createElement('canvas').getContext('2d'); m.font = 'bold 28px system-ui';
@@ -512,7 +514,8 @@ function drawStakes() {
     const nm = k.sv_no.replace('+00.000', '').replace(/\+0?/, '+');
     const top = arLbl ? z0 + 1.2 : z0 + 6.5 - 1.6;      // 線の上端
     const sp = arLbl ? labelSmall(nm, undefined, AR_LH_NO) : label(nm, '設計 ' + k.ds.toFixed(2));
-    sp.position.set(k.x, k.y, arLbl ? top + AR_LH_NO / 2 + 0.05 : z0 + 6.5); stakeGrp.add(sp);
+    if (!arLbl) sp.scale.set(9 * NO_K, 3.4 * NO_K, 1);
+    sp.position.set(k.x, k.y, arLbl ? top + AR_LH_NO / 2 + 0.05 : top + 1.6 * NO_K); stakeGrp.add(sp);
     const g = new THREE.BufferGeometry().setFromPoints(
       [new THREE.Vector3(k.x, k.y, z0), new THREE.Vector3(k.x, k.y, top)]);
     stakeGrp.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x2b6cb0 })));
@@ -530,7 +533,7 @@ function drawStakes() {
     }
     const sp = arLbl ? labelSmall(p.name + ' 法肩', '#f08c00', AR_LH_NO) : label(p.name + ' 法肩', '計画堤防高 ' + p.z.toFixed(3));
     if (arLbl) sp.position.set(p.x, p.y, p.z + h + AR_LH_NO / 2 + 0.04);
-    else { sp.position.set(p.x, p.y, p.z + h + 1.0); sp.scale.set(5, 1.9, 1); }
+    else { sp.position.set(p.x, p.y, p.z + h + 1.0 * NO_K); sp.scale.set(5 * NO_K, 1.9 * NO_K, 1); }
     kataGrp.add(sp);
   }
 }

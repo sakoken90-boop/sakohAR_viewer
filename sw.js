@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v59';  // ★S103 AR 中の 測点の札を 1/3 に
+const V = 'sd-viewer-v60';  // ★S103b ふつうの 3D 画面の 測点の札も 1/3 に
 const CORE = ['./', './index.html', './app.js', './sd_model.json', './logo.png',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
