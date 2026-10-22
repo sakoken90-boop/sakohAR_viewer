@@ -14,7 +14,7 @@ const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
 let kataGrp;                      // ★S93 設計NO 法肩杭（橙の柱）。現況NO杭（stakeGrp）とは 別に 切り替える
-const APP_V = 63;   // ★S106 半透明でも いちばん手前の面だけを 描く（奥行きの先書き）。遠方の 重なりの乱れ対策
+const APP_V = 64;   // ★S107 札（プラカード）も 奥行きで 隠れる（常に手前は やめた）
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -466,7 +466,10 @@ function labelSmall(text, edge, lh = AR_LH) {
   x.fillStyle = '#16202b'; x.font = 'bold 28px system-ui'; x.textAlign = 'center'; x.textBaseline = 'middle';
   x.fillText(text, W / 2, H / 2 + 1);
   const t = new THREE.CanvasTexture(cv); t.anisotropy = 4;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
+  // ★S107 札も 奥行きで 隠れるようにした（低い所から 遠方を見ると 札が 重なって 邪魔）。
+  //   モデルの面や 手前の札の 向こうにある札は 隠れる。札の外の 透明な所は alphaTest で 捨てる
+  //   （捨てないと 手前の札の 四角い透明な所が 奥の札を 欠く）
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: true, depthWrite: true, transparent: true, alphaTest: 0.5 }));
   sp.scale.set(lh * W / H, lh, 1); return sp;
 }
 
@@ -506,7 +509,10 @@ function label(text, sub) {
   x.fillText(text, 128, 32);
   x.fillStyle = '#5d6b78'; x.font = '17px system-ui'; x.fillText(sub, 128, 54);
   const t = new THREE.CanvasTexture(cv); t.anisotropy = 4;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
+  // ★S107 札も 奥行きで 隠れるようにした（低い所から 遠方を見ると 札が 重なって 邪魔）。
+  //   モデルの面や 手前の札の 向こうにある札は 隠れる。札の外の 透明な所は alphaTest で 捨てる
+  //   （捨てないと 手前の札の 四角い透明な所が 奥の札を 欠く）
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: true, depthWrite: true, transparent: true, alphaTest: 0.5 }));
   sp.scale.set(9, 3.4, 1); return sp;
 }
 
