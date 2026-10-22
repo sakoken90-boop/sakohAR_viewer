@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v58';  // ★S102 階段工の移動（モデルの入れ替えを 端末に すぐ 届けるため 版を上げた）
+const V = 'sd-viewer-v59';  // ★S103 AR 中の 測点の札を 1/3 に
 const CORE = ['./', './index.html', './app.js', './sd_model.json', './logo.png',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

@@ -14,7 +14,7 @@ const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
 let kataGrp;                      // ★S93 設計NO 法肩杭（橙の柱）。現況NO杭（stakeGrp）とは 別に 切り替える
-const APP_V = 58;   // ★S102 階段工を 直線区間（2078.370〜2081.010）へ移したモデル。コードの変更は 無し
+const APP_V = 59;   // ★S103 AR 中の 測点の札（現況NO杭・設計NO法肩杭）を 1/3 に
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -438,7 +438,9 @@ function buildAxis() {
 //   幅 1.6 m × 高さ 0.48 m（実寸）。ふつうの 3D 画面の 札（幅 6〜9 m）とは 別に作る
 let arLbl = false;                 // AR 中か（標識の 作り分けに使う）
 const AR_LW = 1.6, AR_LH = 0.48;
-function labelSmall(text, edge) {
+// ★S103 測点（現況NO杭・設計NO法肩杭）の札は さらに 1/3（高さ 0.16 m）。AR基準点の札は 0.48 m のまま
+const AR_LH_NO = AR_LH / 3;
+function labelSmall(text, edge, lh = AR_LH) {
   const s = 2, H = 48;
   const m = document.createElement('canvas').getContext('2d'); m.font = 'bold 28px system-ui';
   const W = Math.max(160, Math.ceil(m.measureText(text).width) + 28);   // ★文字が長ければ 札を 広げる
@@ -453,7 +455,7 @@ function labelSmall(text, edge) {
   x.fillText(text, W / 2, H / 2 + 1);
   const t = new THREE.CanvasTexture(cv); t.anisotropy = 4;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
-  sp.scale.set(AR_LH * W / H, AR_LH, 1); return sp;
+  sp.scale.set(lh * W / H, lh, 1); return sp;
 }
 
 // ★S92 法肩（川表・離れ 9.100）の NO 位置。段階確認の 法線確認用（S88 の K 点と 同じ位置）
@@ -509,8 +511,8 @@ function drawStakes() {
     const z0 = k.z || 5;
     const nm = k.sv_no.replace('+00.000', '').replace(/\+0?/, '+');
     const top = arLbl ? z0 + 1.2 : z0 + 6.5 - 1.6;      // 線の上端
-    const sp = arLbl ? labelSmall(nm) : label(nm, '設計 ' + k.ds.toFixed(2));
-    sp.position.set(k.x, k.y, arLbl ? top + AR_LH / 2 + 0.1 : z0 + 6.5); stakeGrp.add(sp);
+    const sp = arLbl ? labelSmall(nm, undefined, AR_LH_NO) : label(nm, '設計 ' + k.ds.toFixed(2));
+    sp.position.set(k.x, k.y, arLbl ? top + AR_LH_NO / 2 + 0.05 : z0 + 6.5); stakeGrp.add(sp);
     const g = new THREE.BufferGeometry().setFromPoints(
       [new THREE.Vector3(k.x, k.y, z0), new THREE.Vector3(k.x, k.y, top)]);
     stakeGrp.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x2b6cb0 })));
@@ -526,8 +528,8 @@ function drawStakes() {
       b.position.set(p.x, p.y, p.z + 0.006); b.rotation.z = -nearestAxis(p.ds)[3] + rot;
       kataGrp.add(b);
     }
-    const sp = arLbl ? labelSmall(p.name + ' 法肩', '#f08c00') : label(p.name + ' 法肩', '計画堤防高 ' + p.z.toFixed(3));
-    if (arLbl) sp.position.set(p.x, p.y, p.z + h + AR_LH / 2 + 0.08);
+    const sp = arLbl ? labelSmall(p.name + ' 法肩', '#f08c00', AR_LH_NO) : label(p.name + ' 法肩', '計画堤防高 ' + p.z.toFixed(3));
+    if (arLbl) sp.position.set(p.x, p.y, p.z + h + AR_LH_NO / 2 + 0.04);
     else { sp.position.set(p.x, p.y, p.z + h + 1.0); sp.scale.set(5, 1.9, 1); }
     kataGrp.add(sp);
   }
