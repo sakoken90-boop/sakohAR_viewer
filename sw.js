@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v61';  // ★S104 AR10 を削除
+const V = 'sd-viewer-v62';  // ★S105 完成形_面・大型張ブロックの色
 const CORE = ['./', './index.html', './app.js', './sd_model.json', './logo.png',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
