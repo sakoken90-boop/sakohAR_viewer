@@ -14,7 +14,7 @@ const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
 let kataGrp;                      // ★S93 設計NO 法肩杭（橙の柱）。現況NO杭（stakeGrp）とは 別に 切り替える
-const APP_V = 62;   // ★S105 色：完成形_面を緑・大型張ブロックを濃い灰に（モデルの入れ替え）
+const APP_V = 63;   // ★S106 半透明でも いちばん手前の面だけを 描く（奥行きの先書き）。遠方の 重なりの乱れ対策
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -409,6 +409,16 @@ function buildParts() {
     (p.name === '完成形_面' || p.name.startsWith('天端') ? matsFace : matsStr).push(m);
     const mesh = new THREE.Mesh(g, m); mesh.name = p.name;
     mesh.userData.part = true;
+    // ★S106 奥行きの 先書き（色は塗らない 双子）。
+    //   これまで 半透明のときは 奥行きを書かずに 部品ごとに 遠い順で 重ねていたが、
+    //   完成形_面・大型張ブロックは 195 m の 1 枚もので 中心が どれも 工区の真ん中になり、
+    //   遠方で 奥の面が 手前に出る・緑と灰が 混ざる（現場の AR 写真 2026-10-22）。
+    //   → 不透明の段で 全部品の 奥行きだけを 先に書き、半透明の段では いちばん手前の面だけが 塗られる。
+    //   polygonOffset で 奥行きを ごくわずか 奥へずらし、同じ面の色・面の上の 線が 消えないようにする
+    const dm = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide, clippingPlanes: [],
+      polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+    const dmesh = new THREE.Mesh(g, dm); dmesh.renderOrder = -1; dmesh.raycast = () => {};
+    mesh.add(dmesh); mesh.userData.depth = dmesh;     // 親の 表示／非表示に そのまま従う
     mesh.visible = !OFF.has(p.name);
     root.add(mesh); meshes[p.name] = mesh;
   }
@@ -738,7 +748,10 @@ function updateSlice() {
   planes[0].setFromNormalAndCoplanarPoint(nrm, A);
   planes[1].setFromNormalAndCoplanarPoint(nrm.clone().negate(), B);
   const list = on ? planes : [];
-  for (const n in meshes) meshes[n].material.clippingPlanes = list;
+  for (const n in meshes) {
+    meshes[n].material.clippingPlanes = list;
+    const d = meshes[n].userData.depth; if (d) d.material.clippingPlanes = list;   // ★S106 双子も 同じ 切断面
+  }
   if (on) hud(`断面 ${noText(sv)}　設計追距 ${a[0].toFixed(3)}　`
     + `計画河床高 ${F(a[4])}　計画堤防高 ${F(a[5])}`);
 }
@@ -1191,7 +1204,8 @@ function initAR() {
   aim.visible = false; scene.add(aim);
 
   const ring = new THREE.RingGeometry(0.10, 0.14, 32).rotateX(-Math.PI / 2);
-  reticle = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: 0x2f6f4e }));
+  reticle = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: 0x2f6f4e, depthTest: false }));
+  reticle.renderOrder = 998;                          // ★S106 モデルの 奥行きに 隠されないように
   reticle.matrixAutoUpdate = false; reticle.visible = false; scene.add(reticle);
 
   // iPhone/iPad は AR Quick Look（USDZ）、Android は WebXR に振り分ける

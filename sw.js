@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v62';  // ★S105 完成形_面・大型張ブロックの色
+const V = 'sd-viewer-v63';  // ★S106 奥行きの先書き（半透明の重なり対策）
 const CORE = ['./', './index.html', './app.js', './sd_model.json', './logo.png',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
