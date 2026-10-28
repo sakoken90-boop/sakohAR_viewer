@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v64';  // ★S107 札も 奥行きで 隠れる
+const V = 'sd-viewer-v65';  // ★S121 法肩杭を 設計NO. の位置に
 const CORE = ['./', './index.html', './app.js', './sd_model.json', './logo.png',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

@@ -14,7 +14,7 @@ const meshes = {};                // 名前 → Mesh / LineSegments
 const matsFace = [], matsStr = [];
 let stakeGrp, axisLine, markGrp;
 let kataGrp;                      // ★S93 設計NO 法肩杭（橙の柱）。現況NO杭（stakeGrp）とは 別に 切り替える
-const APP_V = 64;   // ★S107 札（プラカード）も 奥行きで 隠れる（常に手前は やめた）
+const APP_V = 65;   // ★S121 法肩杭を 設計NO.（20×n）と EC12・BC13 の位置に
 
 // ★S66 iPhone / iPad で 鋲基準の AR を使うための逃げ道（Variant Launch）
 //   iOS の Safari は WebXR（immersive-ar）を持たないので、既定では
@@ -473,25 +473,31 @@ function labelSmall(text, edge, lh = AR_LH) {
   sp.scale.set(lh * W / H, lh, 1); return sp;
 }
 
-// ★S92 法肩（川表・離れ 9.100）の NO 位置。段階確認の 法線確認用（S88 の K 点と 同じ位置）
+// ★S92 法肩（川表・離れ 9.100）の NO 位置。段階確認の 法線確認用（★S121 から 設計NO.。S88 の現況NO. の点ではない）
 //   位置 ＝ 測点の 設計追加距離（横断方向角の交点＝横断図の 設計NO.）で、設計中心線に 直角に 左岸側へ 9.100。
 //   設計線形（M.axis・0.5 m 毎）を 追加距離で 補間して 出す。
 //   ★追加距離は 上流へ 増えるので 進行方向の 右手が 左岸：(東,北) ＋ (cos, −sin)×9.100
 const KATA_OFF = 9.100;
+// ★S121 発注者の依頼で ★設計NO.（設計追加距離 20×n）と 設計線形の主要点（EC12・BC13）に変えた。
+//   旧版（現況NO. の位置）とは 法線に沿って 0.9〜1.1 m 違う。法線立会図（設計NO.版）・sd_tachiai_sekkei.py と同じ点
+//   護岸の始終点は AR1・AR6 と同じ所なので これまでどおり 出さない
+const KATA_MAIN = [[1982.4429, 'EC12'], [2082.6804, 'BC13']];
+function kataStations() {
+  const lst = [];
+  for (let n = Math.ceil(M.range.lo / 20 - 1e-9); n * 20 <= M.range.hi + 1e-6; n++) lst.push([n * 20, 'NO.' + n]);
+  for (const m of KATA_MAIN) if (m[0] > M.range.lo && m[0] < M.range.hi) lst.push(m);
+  return lst.filter(m => m[0] > M.range.lo + 1e-6 && m[0] < M.range.hi - 1e-6).sort((p, q) => p[0] - q[0]);
+}
 function katamataPts() {
   const ax = M.axis, out = [];
-  for (const k of M.stakes) {
-    const ds = k.ds;
-    if (ds < M.range.lo - 1e-6 || ds > M.range.hi + 1e-6) continue;
-    // 対照表には NO 以外の行（土工の始終点・護岸の始終点）もある。護岸の始終点は AR1・AR6 と同じ所なので 出さない
-    if (/^(土工|護岸)(始|終)点$/.test(k.name || '')) continue;
+  for (const [ds, name] of kataStations()) {
     let a = null, b = null;
     for (let i = 0; i + 1 < ax.length; i++) if (ax[i][0] <= ds && ds <= ax[i + 1][0]) { a = ax[i]; b = ax[i + 1]; break; }
     if (!a) continue;
     const t = (ds - a[0]) / ((b[0] - a[0]) || 1);
     const e = a[1] + (b[1] - a[1]) * t, n = a[2] + (b[2] - a[2]) * t;
     const tn = a[3] + (b[3] - a[3]) * t, z = a[5] + (b[5] - a[5]) * t;   // 計画堤防高（法肩）
-    out.push({ name: k.name || k.sv_no.replace('+00.000', '').replace(/\+0?/, '+'), ds,   // IP14・BC.15 は 点名で
+    out.push({ name, ds,
                x: e + Math.cos(tn) * KATA_OFF, y: n - Math.sin(tn) * KATA_OFF, z });
   }
   return out;
