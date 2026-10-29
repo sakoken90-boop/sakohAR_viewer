@@ -1,5 +1,5 @@
 // 塩田川ビューア オフライン用
-const V = 'sd-viewer-v65';  // ★S121 法肩杭を 設計NO. の位置に
+const V = 'sd-viewer-v66';  // ★S124 AR6 実測標高。S121 法肩杭を 設計NO. の位置に
 const CORE = ['./', './index.html', './app.js', './sd_model.json', './logo.png',
               './model.usdz', './model_ground.usdz', './model_bank.usdz', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
